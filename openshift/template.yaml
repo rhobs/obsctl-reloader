@@ -1,0 +1,80 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: obsctl-reloader
+objects:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: obsctl-reloader
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    name: obsctl-reloader
+  rules:
+  - apiGroups:
+    - monitoring.coreos.com
+    resources:
+    - prometheusrules
+    verbs:
+    - get
+    - list
+    - watch
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: obsctl-reloader
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: obsctl-reloader
+  subjects:
+  - kind: ServiceAccount
+    name: obsctl-reloader
+- apiVersion: batch/v1
+  kind: CronJob
+  metadata:
+    name: obsctl-reloader
+  spec:
+    schedule: "* * * * *"
+    jobTemplate:
+      spec:
+        template:
+          spec:
+            serviceAccountName: obsctl-reloader
+            containers:
+            - name: obsctl
+              image: ${IMAGE}:${IMAGE_TAG}
+              imagePullPolicy: Always
+              command: ["python3", "run.py"]
+              env:
+              - name: OBSERVATORIUM_URL
+                value: ${OBSERVATORIUM_URL}
+              - name: OIDC_AUDIENCE
+                value: ${OIDC_AUDIENCE}
+              - name: OIDC_ISSUER_URL
+                value: ${OIDC_ISSUER_URL}
+              - name: OIDC_CLIENT_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: ${OBSERVATORIUM_API_SECRET_NAME}
+                    key: client_id
+              - name: OIDC_CLIENT_SECRET
+                valueFrom:
+                  secretKeyRef:
+                    name: ${OBSERVATORIUM_API_SECRET_NAME}
+                    key: client_secret
+            restartPolicy: OnFailure
+parameters:
+- name: IMAGE
+  value: quay.io/maorfr/obsctl-reloader
+- name: IMAGE_TAG
+  value: '0.1.0'
+- name: OBSERVATORIUM_URL
+  value: https://observatorium.api.stage.openshift.com
+- name: OIDC_AUDIENCE
+  value: observatorium
+- name: OIDC_ISSUER_URL
+  value: https://sso.redhat.com/auth/realms/redhat-external
+- name: OBSERVATORIUM_API_SECRET_NAME
+  value: rhobs-tenant-staging
