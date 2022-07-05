@@ -46,7 +46,6 @@ objects:
             - name: obsctl
               image: ${IMAGE}:${IMAGE_TAG}
               imagePullPolicy: Always
-              command: ["python3", "run.py"]
               env:
               - name: OBSERVATORIUM_URL
                 value: ${OBSERVATORIUM_URL}

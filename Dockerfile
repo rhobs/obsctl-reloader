@@ -7,3 +7,5 @@ FROM registry.access.redhat.com/ubi8/python-39:1-51
 COPY --chown=0:0 --from=oc /usr/bin/oc /usr/local/bin/
 COPY --chown=0:0 --from=obsctl /go/bin/obsctl /usr/local/bin/
 COPY run.py .
+
+CMD ["python3", "run.py"]
