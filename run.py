@@ -5,11 +5,27 @@ Use obsctl to set rules from PrometheusRules.
 """
 
 import json
+import logging
 import os
 import tempfile
 import subprocess
+import sys
 
 from typing import Any, Optional
+
+
+def setup_logging() -> None:
+    """Setup logging format and handler."""
+    log_format = (
+        "[%(asctime)s] [%(levelname)s] "
+        "[%(filename)s:%(funcName)s:%(lineno)d] - %(message)s"
+    )
+    date_format = "%Y-%m-%d %H:%M:%S"
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter(fmt=log_format,
+                                           datefmt=date_format))
+    logging.basicConfig(level=logging.INFO,
+                        handlers=[handler])
 
 
 def run(cmd: list[str]) -> str:
@@ -30,10 +46,10 @@ def get_tenant(prometheus_rule: dict[str, Any]) -> Optional[str]:
     name = prometheus_rule['metadata']['name']
     try:
         tenant = prometheus_rule["metadata"]["labels"]["tenant"]
-        print(f"prometheus rule {name} has tenant label {tenant}")
+        logging.info("prometheus rule %s has tenant label %s", name, tenant)
         return tenant
     except KeyError:
-        print(f"prometheus rule {name} has no tenant label")
+        logging.info("prometheus rule %s has no tenant label", name)
         return None
 
 
@@ -44,12 +60,12 @@ def get_tenant_rules(prometheus_rules: list[dict[str, Any]]
     for rule in prometheus_rules:
         name = rule["metadata"]["name"]
 
-        print(f"checking prometheus rule {name} for tenant")
+        logging.info("checking prometheus rule %s for tenant", name)
         tenant = get_tenant(rule)
         if not tenant:
             continue
 
-        print(f"checking prometheus rule {name} tenant {tenant}")
+        logging.info("checking prometheus rule %s tenant %s", name, tenant)
         tenant_rules = all_tenant_rules.setdefault(tenant, {"groups": []})
         tenant_rules["groups"].extend(rule["spec"]["groups"])
 
@@ -104,7 +120,7 @@ def obsctl_metrics_get_rules() -> Any:
 
 def obsctl_metrics_set_rules(tenant: str, rules: dict[str, list[dict[str, Any]]]) -> None:
     """Set rules using obsctl."""
-    print(f"setting metrics for tenant {tenant}")
+    logging.info("setting metrics for tenant %s", tenant)
     with tempfile.NamedTemporaryFile(mode="w+") as rule_file:
         rule_file.write(json.dumps(rules))
         rule_file.flush()
@@ -114,6 +130,7 @@ def obsctl_metrics_set_rules(tenant: str, rules: dict[str, list[dict[str, Any]]]
 
 def main():
     """Main execution."""
+    setup_logging()
     prometheus_rules = get_prometheus_rules()
     tenant_rules = get_tenant_rules(prometheus_rules)
     for tenant, rules in tenant_rules.items():
