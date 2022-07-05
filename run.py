@@ -22,15 +22,15 @@ def setup_logging() -> None:
     )
     date_format = "%Y-%m-%d %H:%M:%S"
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter(fmt=log_format,
-                                           datefmt=date_format))
-    logging.basicConfig(level=logging.INFO,
-                        handlers=[handler])
+    handler.setFormatter(logging.Formatter(fmt=log_format, datefmt=date_format))
+    logging.basicConfig(level=logging.INFO, handlers=[handler])
 
 
 def run(cmd: list[str]) -> str:
     """Run shell command."""
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+    result = subprocess.run(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True
+    )
     return result.stdout.decode()
 
 
@@ -43,7 +43,7 @@ def get_prometheus_rules() -> dict[str, Any]:
 
 def get_tenant(prometheus_rule: dict[str, Any]) -> Optional[str]:
     """Get tenant label from PrometheusRule."""
-    name = prometheus_rule['metadata']['name']
+    name = prometheus_rule["metadata"]["name"]
     try:
         tenant = prometheus_rule["metadata"]["labels"]["tenant"]
         logging.info("prometheus rule %s has tenant label %s", name, tenant)
@@ -53,7 +53,8 @@ def get_tenant(prometheus_rule: dict[str, Any]) -> Optional[str]:
         return None
 
 
-def get_tenant_rules(prometheus_rules: list[dict[str, Any]]
+def get_tenant_rules(
+    prometheus_rules: list[dict[str, Any]]
 ) -> dict[str, dict[str, list[dict[str, Any]]]]:
     """Get rules per tenant from PrometheusRules."""
     all_tenant_rules: dict[str, dict[str, list[dict[str, Any]]]] = {}
@@ -79,8 +80,10 @@ def obsctl_context_add(tenant: str) -> None:
         "context",
         "api",
         "add",
-        "--name", tenant,
-        "--url", os.environ["OBSERVATORIUM_URL"],
+        "--name",
+        tenant,
+        "--url",
+        os.environ["OBSERVATORIUM_URL"],
     ]
     run(cmd)
 
@@ -90,12 +93,18 @@ def obsctl_login(tenant: str) -> None:
     cmd = [
         "obsctl",
         "login",
-        "--api", tenant,
-        "--oidc.audience", os.environ["OIDC_AUDIENCE"],
-        "--oidc.client-id", os.environ["OIDC_CLIENT_ID"],
-        "--oidc.client-secret", os.environ["OIDC_CLIENT_SECRET"],
-        "--oidc.issuer-url", os.environ["OIDC_ISSUER_URL"],
-        "--tenant", tenant,
+        "--api",
+        tenant,
+        "--oidc.audience",
+        os.environ["OIDC_AUDIENCE"],
+        "--oidc.client-id",
+        os.environ["OIDC_CLIENT_ID"],
+        "--oidc.client-secret",
+        os.environ["OIDC_CLIENT_SECRET"],
+        "--oidc.issuer-url",
+        os.environ["OIDC_ISSUER_URL"],
+        "--tenant",
+        tenant,
     ]
     run(cmd)
 
@@ -118,7 +127,9 @@ def obsctl_metrics_get_rules() -> Any:
     return json.loads(result)
 
 
-def obsctl_metrics_set_rules(tenant: str, rules: dict[str, list[dict[str, Any]]]) -> None:
+def obsctl_metrics_set_rules(
+    tenant: str, rules: dict[str, list[dict[str, Any]]]
+) -> None:
     """Set rules using obsctl."""
     logging.info("setting metrics for tenant %s", tenant)
     with tempfile.NamedTemporaryFile(mode="w+") as rule_file:
@@ -140,5 +151,5 @@ def main():
         obsctl_metrics_set_rules(tenant, rules)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
