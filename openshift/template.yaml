@@ -73,7 +73,7 @@ objects:
             value: "${SLEEP_DURATION_SECONDS}"
 parameters:
 - name: IMAGE
-  value: quay.io/maorfr/obsctl-reloader
+  value: quay.io/app-sre/obsctl-reloader
 - name: IMAGE_TAG
   value: latest
 - name: OBSERVATORIUM_URL

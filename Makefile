@@ -3,7 +3,7 @@
 CONTAINER_ENGINE ?= $(shell which podman >/dev/null 2>&1 && echo podman || echo docker)
 AUTH_FLAG ?= $(shell which podman >/dev/null 2>&1 && echo --authfile || echo --config)
 
-IMAGE_NAME := quay.io/maorfr/obsctl-reloader
+IMAGE_NAME := quay.io/app-sre/obsctl-reloader
 IMAGE_TAG := $(shell git rev-parse --short=7 HEAD)
 DOCKER_CONF := $(PWD)/.docker
 
