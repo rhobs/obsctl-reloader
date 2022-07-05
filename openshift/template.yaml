@@ -71,6 +71,8 @@ objects:
                 key: client_secret
           - name: SLEEP_DURATION_SECONDS
             value: "${SLEEP_DURATION_SECONDS}"
+          - name: ALLOW_CLI_LOGS
+            value: ${ALLOW_CLI_LOGS}
 parameters:
 - name: IMAGE
   value: quay.io/app-sre/obsctl-reloader
@@ -86,3 +88,5 @@ parameters:
   value: rhobs-tenant-staging
 - name: SLEEP_DURATION_SECONDS
   value: "30"
+- name: ALLOW_CLI_LOGS
+  value: true
