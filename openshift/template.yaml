@@ -70,7 +70,7 @@ objects:
                 name: ${OBSERVATORIUM_API_SECRET_NAME}
                 key: client_secret
           - name: SLEEP_DURATION_SECONDS
-            value: ${{SLEEP_DURATION_SECONDS}}
+            value: "${SLEEP_DURATION_SECONDS}"
 parameters:
 - name: IMAGE
   value: quay.io/maorfr/obsctl-reloader
