@@ -31,41 +31,46 @@ objects:
   subjects:
   - kind: ServiceAccount
     name: obsctl-reloader
-- apiVersion: batch/v1
-  kind: CronJob
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
     name: obsctl-reloader
+    labels:
+      app: obsctl-reloader
   spec:
-    schedule: "* * * * *"
-    jobTemplate:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: obsctl-reloader
+    template:
+      metadata:
+        labels:
+          app: obsctl-reloader
       spec:
-        template:
-          spec:
-            serviceAccountName: obsctl-reloader
-            containers:
-            - name: obsctl
-              image: ${IMAGE}:${IMAGE_TAG}
-              imagePullPolicy: Always
-              env:
-              - name: OBSERVATORIUM_URL
-                value: ${OBSERVATORIUM_URL}
-              - name: OIDC_AUDIENCE
-                value: ${OIDC_AUDIENCE}
-              - name: OIDC_ISSUER_URL
-                value: ${OIDC_ISSUER_URL}
-              - name: OIDC_CLIENT_ID
-                valueFrom:
-                  secretKeyRef:
-                    name: ${OBSERVATORIUM_API_SECRET_NAME}
-                    key: client_id
-              - name: OIDC_CLIENT_SECRET
-                valueFrom:
-                  secretKeyRef:
-                    name: ${OBSERVATORIUM_API_SECRET_NAME}
-                    key: client_secret
-              - name: SLEEP_DURATION_SECONDS
-                value: ${SLEEP_DURATION_SECONDS}
-            restartPolicy: OnFailure
+        serviceAccountName: obsctl-reloader
+        containers:
+        - name: obsctl
+          image: ${IMAGE}:${IMAGE_TAG}
+          imagePullPolicy: Always
+          env:
+          - name: OBSERVATORIUM_URL
+            value: ${OBSERVATORIUM_URL}
+          - name: OIDC_AUDIENCE
+            value: ${OIDC_AUDIENCE}
+          - name: OIDC_ISSUER_URL
+            value: ${OIDC_ISSUER_URL}
+          - name: OIDC_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: ${OBSERVATORIUM_API_SECRET_NAME}
+                key: client_id
+          - name: OIDC_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: ${OBSERVATORIUM_API_SECRET_NAME}
+                key: client_secret
+          - name: SLEEP_DURATION_SECONDS
+            value: ${SLEEP_DURATION_SECONDS}
 parameters:
 - name: IMAGE
   value: quay.io/maorfr/obsctl-reloader
