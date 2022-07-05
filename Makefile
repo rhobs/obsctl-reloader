@@ -21,6 +21,7 @@ push:
 	@$(CONTAINER_ENGINE) push $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json $(IMAGE_NAME):$(IMAGE_TAG)
 
 deploy:
+	oc apply -f examples/prometheusrule.yaml
 	oc process -p IMAGE_TAG=$(IMAGE_TAG) -f openshift/template.yaml | oc apply -f -
 
 format:
