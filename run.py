@@ -10,11 +10,13 @@ import os
 import tempfile
 import subprocess
 import sys
+import time
 
 from typing import Any, Optional
 
 
 OBSCTL_CONTEXT = "api"
+DEFAULT_SLEEP_DURATION_SECONDS = 30
 
 
 def setup_logging() -> None:
@@ -155,19 +157,30 @@ def obsctl_metrics_set_rules(
         run(cmd)
 
 
+def sleep():
+    """Sleep between iterations."""
+    sleep_duration_seconds = os.environ.get(
+        "SLEEP_DURATION_SECONDS", DEFAULT_SLEEP_DURATION_SECONDS
+    )
+    logging.info("sleeping for %d seconds", sleep_duration_seconds)
+    time.sleep(sleep_duration_seconds)
+
+
 def main():
     """Main execution."""
     setup_logging()
-    prometheus_rules = get_prometheus_rules()
-    tenant_rules = get_tenant_rules(prometheus_rules)
-    for tenant, rules in tenant_rules.items():
-        try:
-            obsctl_context_add()
-            obsctl_login(tenant)
-            obsctl_context_switch(tenant)
-            obsctl_metrics_set_rules(tenant, rules)
-        finally:
-            obsctl_context_remove()
+    while True:
+        prometheus_rules = get_prometheus_rules()
+        tenant_rules = get_tenant_rules(prometheus_rules)
+        for tenant, rules in tenant_rules.items():
+            try:
+                obsctl_context_add()
+                obsctl_login(tenant)
+                obsctl_context_switch(tenant)
+                obsctl_metrics_set_rules(tenant, rules)
+            finally:
+                obsctl_context_remove()
+        sleep()
 
 
 if __name__ == "__main__":

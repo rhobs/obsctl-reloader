@@ -63,6 +63,8 @@ objects:
                   secretKeyRef:
                     name: ${OBSERVATORIUM_API_SECRET_NAME}
                     key: client_secret
+              - name: SLEEP_DURATION_SECONDS
+                value: ${SLEEP_DURATION_SECONDS}
             restartPolicy: OnFailure
 parameters:
 - name: IMAGE
@@ -77,3 +79,5 @@ parameters:
   value: https://sso.redhat.com/auth/realms/redhat-external
 - name: OBSERVATORIUM_API_SECRET_NAME
   value: rhobs-tenant-staging
+- name: SLEEP_DURATION_SECONDS
+  value: 30
