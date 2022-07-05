@@ -20,5 +20,8 @@ push:
 	@$(CONTAINER_ENGINE) push $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json $(IMAGE_NAME):latest
 	@$(CONTAINER_ENGINE) push $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json $(IMAGE_NAME):$(IMAGE_TAG)
 
+deploy:
+	oc process -p IMAGE_TAG=$(IMAGE_TAG) -f openshift/template.yaml | oc apply -f -
+
 format:
 	@. ./venv/bin/activate && black run.py
