@@ -14,6 +14,9 @@ import sys
 from typing import Any, Optional
 
 
+OBSCTL_CONTEXT = "api"
+
+
 def setup_logging() -> None:
     """Setup logging format and handler."""
     log_format = (
@@ -73,7 +76,7 @@ def get_tenant_rules(
     return all_tenant_rules
 
 
-def obsctl_context_add(tenant: str) -> None:
+def obsctl_context_add() -> None:
     """Add context to obsctl."""
     cmd = [
         "obsctl",
@@ -81,9 +84,22 @@ def obsctl_context_add(tenant: str) -> None:
         "api",
         "add",
         "--name",
-        tenant,
+        OBSCTL_CONTEXT,
         "--url",
         os.environ["OBSERVATORIUM_URL"],
+    ]
+    run(cmd)
+
+
+def obsctl_context_remove() -> None:
+    """Remove context using obsctl."""
+    cmd = [
+        "obsctl",
+        "context",
+        "api",
+        "rm",
+        "--name",
+        OBSCTL_CONTEXT,
     ]
     run(cmd)
 
@@ -94,7 +110,7 @@ def obsctl_login(tenant: str) -> None:
         "obsctl",
         "login",
         "--api",
-        tenant,
+        OBSCTL_CONTEXT,
         "--oidc.audience",
         os.environ["OIDC_AUDIENCE"],
         "--oidc.client-id",
@@ -115,7 +131,7 @@ def obsctl_context_switch(tenant: str) -> None:
         "obsctl",
         "context",
         "switch",
-        f"{tenant}/{tenant}",
+        f"{OBSCTL_CONTEXT}/{tenant}",
     ]
     run(cmd)
 
@@ -145,10 +161,13 @@ def main():
     prometheus_rules = get_prometheus_rules()
     tenant_rules = get_tenant_rules(prometheus_rules)
     for tenant, rules in tenant_rules.items():
-        obsctl_context_add(tenant)
-        obsctl_login(tenant)
-        obsctl_context_switch(tenant)
-        obsctl_metrics_set_rules(tenant, rules)
+        try:
+            obsctl_context_add()
+            obsctl_login(tenant)
+            obsctl_context_switch(tenant)
+            obsctl_metrics_set_rules(tenant, rules)
+        finally:
+            obsctl_context_remove()
 
 
 if __name__ == "__main__":
