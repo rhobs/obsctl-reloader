@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 OBSCTL_CONTEXT = "api"
 DEFAULT_SLEEP_DURATION_SECONDS = 30
-
+OBSCTL_LOGS = "--log.level=debug"
 
 def setup_logging() -> None:
     """Setup logging format and handler."""
@@ -90,6 +90,10 @@ def obsctl_context_add() -> None:
         "--url",
         os.environ["OBSERVATORIUM_URL"],
     ]
+
+    if "ALLOW_CLI_LOGS" in os.environ:
+        cmd.append(OBSCTL_LOGS)
+
     run(cmd)
 
 
@@ -103,6 +107,10 @@ def obsctl_context_remove() -> None:
         "--name",
         OBSCTL_CONTEXT,
     ]
+
+    if "ALLOW_CLI_LOGS" in os.environ:
+        cmd.append(OBSCTL_LOGS)
+
     run(cmd)
 
 
@@ -124,6 +132,10 @@ def obsctl_login(tenant: str) -> None:
         "--tenant",
         tenant,
     ]
+
+    if "ALLOW_CLI_LOGS" in os.environ:
+        cmd.append(OBSCTL_LOGS)
+
     run(cmd)
 
 
@@ -135,13 +147,17 @@ def obsctl_context_switch(tenant: str) -> None:
         "switch",
         f"{OBSCTL_CONTEXT}/{tenant}",
     ]
+
+    if "ALLOW_CLI_LOGS" in os.environ:
+        cmd.append(OBSCTL_LOGS)
+
     run(cmd)
 
 
 def obsctl_metrics_get_rules() -> Any:
     """Get rules using obsctl."""
     cmd = ["obsctl", "metrics", "get", "rules"]
-    result = run(cmd)
+    result = run(cmd) # Avoid logging to only have JSON output.
     return json.loads(result)
 
 
@@ -154,6 +170,8 @@ def obsctl_metrics_set_rules(
         rule_file.write(json.dumps(rules))
         rule_file.flush()
         cmd = ["obsctl", "metrics", "set", "--rule.file", rule_file.name]
+        if "ALLOW_CLI_LOGS" in os.environ:
+            cmd.append(OBSCTL_LOGS)
         run(cmd)
 
 
