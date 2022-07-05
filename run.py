@@ -159,8 +159,8 @@ def obsctl_metrics_set_rules(
 
 def sleep():
     """Sleep between iterations."""
-    sleep_duration_seconds = os.environ.get(
-        "SLEEP_DURATION_SECONDS", DEFAULT_SLEEP_DURATION_SECONDS
+    sleep_duration_seconds = int(
+        os.environ.get("SLEEP_DURATION_SECONDS", DEFAULT_SLEEP_DURATION_SECONDS)
     )
     logging.info("sleeping for %d seconds", sleep_duration_seconds)
     time.sleep(sleep_duration_seconds)
