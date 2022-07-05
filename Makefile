@@ -10,15 +10,15 @@ DOCKER_CONF := $(PWD)/.docker
 
 login:
 	mkdir -p $(DOCKER_CONF)
-	@$(CONTAINER_ENGINE) login $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json -u="${QUAY_USER}" -p="${QUAY_TOKEN}" quay.io
+	@$(CONTAINER_ENGINE) $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json login -u="${QUAY_USER}" -p="${QUAY_TOKEN}" quay.io
 
 build:
-	@$(CONTAINER_ENGINE) build $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json -t $(IMAGE_NAME):latest .
+	@$(CONTAINER_ENGINE) $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json build -t $(IMAGE_NAME):latest .
 	@$(CONTAINER_ENGINE) tag $(IMAGE_NAME):latest $(IMAGE_NAME):$(IMAGE_TAG)
 
 push:
-	@$(CONTAINER_ENGINE) push $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json $(IMAGE_NAME):latest
-	@$(CONTAINER_ENGINE) push $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json $(IMAGE_NAME):$(IMAGE_TAG)
+	@$(CONTAINER_ENGINE) $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json push $(IMAGE_NAME):latest
+	@$(CONTAINER_ENGINE) $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json push $(IMAGE_NAME):$(IMAGE_TAG)
 
 deploy:
 	oc apply -f examples/prometheusrule.yaml
