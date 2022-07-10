@@ -36,7 +36,10 @@ func GetPrometheusRules() ([]monitoringv1.PrometheusRule, error) {
 		if err != nil {
 			return nil, err
 		}
-		json.Unmarshal(j, &obj)
+		err = json.Unmarshal(j, &obj)
+		if err != nil {
+			return nil, err
+		}
 		prometheusRules[idx] = obj
 	}
 
