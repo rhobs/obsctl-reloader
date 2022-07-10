@@ -57,7 +57,7 @@ func GetPrometheusRules() ([]monitoringv1.PrometheusRule, error) {
 	return prometheusRules, nil
 }
 
-func GetTenantRules(prometheusRules []monitoringv1.PrometheusRule) map[string][]monitoringv1.RuleGroup {
+func GetTenantRules(prometheusRules []monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
 	tenantRules := make(map[string][]monitoringv1.RuleGroup)
 	for _, pr := range prometheusRules {
 		level.Info(logger).Log("msg", "checking prometheus rule for tenant", "name", pr.Name)
@@ -66,7 +66,13 @@ func GetTenantRules(prometheusRules []monitoringv1.PrometheusRule) map[string][]
 			tenantRules[tenant] = append(tenantRules[tenant], pr.Spec.Groups...)
 		}
 	}
-	return tenantRules
+
+	tenantRuleGroups := make(map[string]monitoringv1.PrometheusRuleSpec, len(tenantRules))
+	for tenant, tr := range tenantRules {
+		tenantRuleGroups[tenant] = monitoringv1.PrometheusRuleSpec{Groups: tr}
+	}
+
+	return tenantRuleGroups
 }
 
 func InitObsctlTenantConfig(ctx context.Context, tenant string) (obsctlconfig.TenantConfig, error) {
@@ -95,7 +101,7 @@ func InitObsctlTenantConfig(ctx context.Context, tenant string) (obsctlconfig.Te
 	return tenantCfg, nil
 }
 
-func ObsctlMetricsSet(ctx context.Context, tenantConfig obsctlconfig.TenantConfig, rules []monitoringv1.RuleGroup) error {
+func ObsctlMetricsSet(ctx context.Context, tenantConfig obsctlconfig.TenantConfig, rules monitoringv1.PrometheusRuleSpec) error {
 	level.Info(logger).Log("msg", "setting metrics for tenant", "tenant", tenantConfig.Tenant)
 	api := os.Getenv("OBSERVATORIUM_URL")
 	c, err := tenantConfig.Client(ctx, logger)
