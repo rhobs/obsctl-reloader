@@ -23,6 +23,3 @@ push:
 deploy:
 	oc apply -f examples/prometheusrule.yaml
 	oc process -p IMAGE_TAG=$(IMAGE_TAG) -f openshift/template.yaml | oc apply -f -
-
-format:
-	@. ./venv/bin/activate && black run.py
