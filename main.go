@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/go-kit/log"
@@ -123,7 +122,13 @@ func ObsctlMetricsSet(ctx context.Context, tenantConfig obsctlconfig.TenantConfi
 		level.Error(logger).Log("msg", "getting response", "error", err)
 		return err
 	}
-	fmt.Println(resp.StatusCode())
+	if resp.StatusCode()/100 != 2 {
+		if len(resp.Body) != 0 {
+			level.Error(logger).Log("msg", "setting rules", "error", string(resp.Body))
+			return err
+		}
+	}
+	level.Info(logger).Log("msg", string(resp.Body))
 
 	return nil
 }
