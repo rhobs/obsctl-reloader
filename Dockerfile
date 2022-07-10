@@ -8,5 +8,6 @@ COPY --chown=0:0 --from=builder /tmp/obsctl-reloader /usr/local/bin/
 
 # level=error msg="add api" error="creating config directory: mkdir /.config: permission denied"
 RUN mkdir /.config
+RUN mkdir /.config/obsctl
 
 CMD ["obsctl-reloader"]
