@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -113,7 +115,16 @@ func ObsctlMetricsSet(ctx context.Context, tenantConfig config.TenantConfig, rul
 }
 
 func main() {
-	ctx := context.TODO()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		cancel()
+	}()
+
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 	prometheusRules, err := GetPrometheusRules(ctx)
 	if err != nil {
