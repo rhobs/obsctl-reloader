@@ -1,11 +1,9 @@
-FROM quay.io/openshift/origin-cli:4.10.0 as oc
+FROM quay.io/app-sre/golang:1.17.11 as builder
+WORKDIR /app
+COPY . .
+RUN go build -o /usr/bin/obsctl-reloader
 
-FROM quay.io/app-sre/golang:1.17.11 as obsctl
-RUN go install github.com/observatorium/obsctl@latest
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4
+COPY --chown=0:0 --from=builder /usr/bin/obsctl-reloader /usr/local/bin/
 
-FROM registry.access.redhat.com/ubi8/python-39:1-51
-COPY --chown=0:0 --from=oc /usr/bin/oc /usr/local/bin/
-COPY --chown=0:0 --from=obsctl /go/bin/obsctl /usr/local/bin/
-COPY run.py .
-
-CMD ["python3", "run.py"]
+CMD ["obsctl-reloader"]
