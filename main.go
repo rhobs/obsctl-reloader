@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,7 +23,7 @@ func GetPrometheusRules() ([]monitoringv1.PrometheusRule, error) {
 		Version:  "v1",
 		Resource: "prometheusrules",
 	}
-	list, err := dynamic.Resource(resourceId).Namespace("observatorium-stage").
+	list, err := dynamic.Resource(resourceId).Namespace(os.Getenv("NAMESPACE_NAME")).
 		List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
