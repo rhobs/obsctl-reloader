@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/go-kit/log"
+	obsctlconfig "github.com/observatorium/obsctl/pkg/config"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -67,6 +68,8 @@ func main() {
 	tenantRules := GetTenantRules(prometheusRules)
 	for tenant, rules := range tenantRules {
 		fmt.Println(tenant)
+		config := &obsctlconfig.Config{}
+		config.AddAPI(logger, "url", os.Getenv("OBSERVATORIUM_URL"))
 		fmt.Println(rules)
 	}
 }
