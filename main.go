@@ -115,10 +115,18 @@ func ObsctlMetricsSet(ctx context.Context, tenantConfig config.TenantConfig, rul
 func main() {
 	ctx := context.TODO()
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-	prometheusRules, _ := GetPrometheusRules(ctx)
+	prometheusRules, err := GetPrometheusRules(ctx)
+	if err != nil {
+		level.Error(logger).Log("msg", "error getting prometheus rules")
+		os.Exit(1)
+	}
 	tenantRules := GetTenantRules(prometheusRules)
 	for tenant, rules := range tenantRules {
-		tenantConfig, _ := InitObsctlTenantConfig(ctx, tenant)
+		tenantConfig, err := InitObsctlTenantConfig(ctx, tenant)
+		if err != nil {
+			level.Error(logger).Log("msg", "error initiating obsctl tenant config")
+			os.Exit(1)
+		}
 		ObsctlMetricsSet(ctx, tenantConfig, rules)
 	}
 }
