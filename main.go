@@ -97,7 +97,11 @@ func ObsctlMetricsSet(ctx context.Context, tenantConfig config.TenantConfig, rul
 		level.Error(logger).Log("msg", "getting fetcher client", "error", err)
 		return err
 	}
-	body, _ := json.Marshal(rules)
+	body, err := json.Marshal(rules)
+	if err != nil {
+		level.Error(logger).Log("msg", "converting rules to json", "error", err)
+		return err
+	}
 	resp, err := fc.SetRawRulesWithBodyWithResponse(ctx, parameters.Tenant(tenantConfig.Tenant), "application/yaml", bytes.NewReader(body))
 	if err != nil {
 		level.Error(logger).Log("msg", "getting response", "error", err)
