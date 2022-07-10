@@ -32,7 +32,10 @@ func GetPrometheusRules() ([]monitoringv1.PrometheusRule, error) {
 	prometheusRules := make([]monitoringv1.PrometheusRule, len(list.Items))
 	for idx, item := range list.Items {
 		obj := monitoringv1.PrometheusRule{}
-		j, _ := json.Marshal(item.Object)
+		j, err := json.Marshal(item.Object)
+		if err != nil {
+			return nil, err
+		}
 		json.Unmarshal(j, &obj)
 		prometheusRules[idx] = obj
 	}
