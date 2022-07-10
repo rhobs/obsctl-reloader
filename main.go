@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,9 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	"github.com/observatorium/api/client"
+	"github.com/observatorium/api/client/parameters"
+	"github.com/observatorium/obsctl/pkg/config"
 	obsctlconfig "github.com/observatorium/obsctl/pkg/config"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +19,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+const obsctlContext = "api"
 
 var logger log.Logger
 
@@ -63,14 +69,66 @@ func GetTenantRules(prometheusRules []monitoringv1.PrometheusRule) map[string][]
 	return tenantRules
 }
 
+func InitObsctlTenantConfig(ctx context.Context, tenant string) (obsctlconfig.TenantConfig, error) {
+	api := os.Getenv("OBSERVATORIUM_URL")
+	conf := &obsctlconfig.Config{}
+	tenantCfg := config.TenantConfig{OIDC: new(config.OIDCConfig)}
+	if err := conf.AddAPI(logger, obsctlContext, api); err != nil {
+		level.Error(logger).Log("msg", "add api", "error", err)
+		return tenantCfg, err
+	}
+	tenantCfg.Tenant = tenant
+	tenantCfg.OIDC.Audience = os.Getenv("OIDC_AUDIENCE")
+	tenantCfg.OIDC.ClientID = os.Getenv("OIDC_CLIENT_ID")
+	tenantCfg.OIDC.ClientSecret = os.Getenv("OIDC_CLIENT_SECRET")
+	tenantCfg.OIDC.IssuerURL = os.Getenv("OIDC_ISSUER_URL")
+	if _, err := tenantCfg.Client(ctx, logger); err != nil {
+		level.Error(logger).Log("msg", "creating authenticated client", "error", err)
+		return tenantCfg, err
+	}
+
+	if err := conf.AddTenant(logger, tenantCfg.Tenant, obsctlContext, tenantCfg.Tenant, tenantCfg.OIDC); err != nil {
+		level.Error(logger).Log("msg", "adding tenant", "error", err)
+		return tenantCfg, err
+	}
+
+	return tenantCfg, nil
+}
+
+func ObsctlMetricsSet(ctx context.Context, tenantConfig obsctlconfig.TenantConfig, rules []monitoringv1.RuleGroup) error {
+	level.Info(logger).Log("msg", "setting metrics for tenant", "tenant", tenantConfig.Tenant)
+	api := os.Getenv("OBSERVATORIUM_URL")
+	c, err := tenantConfig.Client(ctx, logger)
+	if err != nil {
+		level.Error(logger).Log("msg", "getting client", "error", err)
+		return err
+	}
+	fc, err := client.NewClientWithResponses(api, func(f *client.Client) error {
+		f.Client = c
+		return err
+	})
+	if err != nil {
+		level.Error(logger).Log("msg", "getting fetcher client", "error", err)
+		return err
+	}
+	body, _ := json.Marshal(rules)
+	resp, err := fc.SetRawRulesWithBodyWithResponse(ctx, parameters.Tenant(tenantConfig.Tenant), "application/yaml", bytes.NewReader(body))
+	if err != nil {
+		level.Error(logger).Log("msg", "getting response", "error", err)
+		return err
+	}
+	fmt.Println(resp.StatusCode())
+
+	return nil
+}
+
 func main() {
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 	prometheusRules, _ := GetPrometheusRules()
 	tenantRules := GetTenantRules(prometheusRules)
 	for tenant, rules := range tenantRules {
-		fmt.Println(tenant)
-		config := &obsctlconfig.Config{}
-		config.AddAPI(logger, "url", os.Getenv("OBSERVATORIUM_URL"))
-		fmt.Println(rules)
+		ctx := context.TODO()
+		tenantConfig, _ := InitObsctlTenantConfig(ctx, tenant)
+		ObsctlMetricsSet(ctx, tenantConfig, rules)
 	}
 }

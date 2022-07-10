@@ -4,20 +4,12 @@ go 1.17
 
 require (
 	github.com/go-kit/log v0.2.0
+	github.com/observatorium/api v0.1.3-0.20220419075223-a158e7fdc72f
 	github.com/observatorium/obsctl v0.1.0-rc.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.57.0
 	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v0.24.2
 	sigs.k8s.io/controller-runtime v0.12.3
-)
-
-require (
-	github.com/kr/pretty v0.3.0 // indirect
-	github.com/rogpeppe/go-internal v1.8.0 // indirect
-	github.com/stretchr/testify v1.7.1 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
 
 require (
@@ -27,9 +19,11 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/go-oidc/v3 v3.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/deepmap/oapi-codegen v1.9.1 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
+	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
