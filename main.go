@@ -11,11 +11,9 @@ import (
 	"github.com/observatorium/api/client"
 	"github.com/observatorium/api/client/parameters"
 	"github.com/observatorium/obsctl/pkg/config"
-	obsctlconfig "github.com/observatorium/obsctl/pkg/config"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringclient "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -23,40 +21,21 @@ const obsctlContext = "api"
 
 var logger log.Logger
 
-func GetPrometheusRules() ([]monitoringv1.PrometheusRule, error) {
-	ctx := context.Background()
-	config := ctrl.GetConfigOrDie()
-	dynamic := dynamic.NewForConfigOrDie(config)
-
-	resourceId := schema.GroupVersionResource{
-		Group:    "monitoring.coreos.com",
-		Version:  "v1",
-		Resource: "prometheusrules",
+func GetPrometheusRules(ctx context.Context) ([]*monitoringv1.PrometheusRule, error) {
+	client, err := monitoringclient.NewForConfig(ctrl.GetConfigOrDie())
+	if err != nil {
+		return nil, err
 	}
-	list, err := dynamic.Resource(resourceId).Namespace(os.Getenv("NAMESPACE_NAME")).
+	prometheusRules, err := client.MonitoringV1().PrometheusRules(os.Getenv("NAMESPACE_NAME")).
 		List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	prometheusRules := make([]monitoringv1.PrometheusRule, len(list.Items))
-	for idx, item := range list.Items {
-		obj := monitoringv1.PrometheusRule{}
-		j, err := json.Marshal(item.Object)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(j, &obj)
-		if err != nil {
-			return nil, err
-		}
-		prometheusRules[idx] = obj
-	}
-
-	return prometheusRules, nil
+	return prometheusRules.Items, nil
 }
 
-func GetTenantRules(prometheusRules []monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
+func GetTenantRules(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
 	tenantRules := make(map[string][]monitoringv1.RuleGroup)
 	for _, pr := range prometheusRules {
 		level.Info(logger).Log("msg", "checking prometheus rule for tenant", "name", pr.Name)
@@ -74,9 +53,9 @@ func GetTenantRules(prometheusRules []monitoringv1.PrometheusRule) map[string]mo
 	return tenantRuleGroups
 }
 
-func InitObsctlTenantConfig(ctx context.Context, tenant string) (obsctlconfig.TenantConfig, error) {
+func InitObsctlTenantConfig(ctx context.Context, tenant string) (config.TenantConfig, error) {
 	api := os.Getenv("OBSERVATORIUM_URL")
-	conf := &obsctlconfig.Config{}
+	conf := &config.Config{}
 	tenantCfg := config.TenantConfig{OIDC: new(config.OIDCConfig)}
 	if err := conf.AddAPI(logger, obsctlContext, api); err != nil {
 		level.Error(logger).Log("msg", "add api", "error", err)
@@ -100,7 +79,7 @@ func InitObsctlTenantConfig(ctx context.Context, tenant string) (obsctlconfig.Te
 	return tenantCfg, nil
 }
 
-func ObsctlMetricsSet(ctx context.Context, tenantConfig obsctlconfig.TenantConfig, rules monitoringv1.PrometheusRuleSpec) error {
+func ObsctlMetricsSet(ctx context.Context, tenantConfig config.TenantConfig, rules monitoringv1.PrometheusRuleSpec) error {
 	level.Info(logger).Log("msg", "setting metrics for tenant", "tenant", tenantConfig.Tenant)
 	api := os.Getenv("OBSERVATORIUM_URL")
 	c, err := tenantConfig.Client(ctx, logger)
@@ -134,11 +113,11 @@ func ObsctlMetricsSet(ctx context.Context, tenantConfig obsctlconfig.TenantConfi
 }
 
 func main() {
+	ctx := context.TODO()
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-	prometheusRules, _ := GetPrometheusRules()
+	prometheusRules, _ := GetPrometheusRules(ctx)
 	tenantRules := GetTenantRules(prometheusRules)
 	for tenant, rules := range tenantRules {
-		ctx := context.TODO()
 		tenantConfig, _ := InitObsctlTenantConfig(ctx, tenant)
 		ObsctlMetricsSet(ctx, tenantConfig, rules)
 	}
