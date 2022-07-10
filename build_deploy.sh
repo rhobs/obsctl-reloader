@@ -1,3 +1,3 @@
 #!/bin/bash
 
-make login build push
+make build login push
