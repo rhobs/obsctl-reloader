@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -20,6 +22,7 @@ import (
 )
 
 const obsctlContext = "api"
+const defaultSleepDurationSeconds = 30
 
 var logger log.Logger
 
@@ -118,6 +121,15 @@ func ObsctlMetricsSet(ctx context.Context, tenantConfig config.TenantConfig, rul
 	return nil
 }
 
+func Sleep() {
+	sleepDurationSeconds := defaultSleepDurationSeconds
+	if value, ok := os.LookupEnv("SLEEP_DURATION_SECONDS"); ok {
+		sleepDurationSeconds, _ = strconv.Atoi(value)
+	}
+	level.Info(logger).Log("msg", "sleeping", "duration", sleepDurationSeconds)
+	time.Sleep(time.Duration(sleepDurationSeconds) * time.Second)
+}
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -130,22 +142,25 @@ func main() {
 	}()
 
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-	prometheusRules, err := GetPrometheusRules(ctx)
-	if err != nil {
-		level.Error(logger).Log("msg", "error getting prometheus rules")
-		os.Exit(1)
-	}
-	tenantRules := GetTenantRules(prometheusRules)
-	for tenant, rules := range tenantRules {
-		tenantConfig, err := InitObsctlTenantConfig(ctx, tenant)
+	for true {
+		prometheusRules, err := GetPrometheusRules(ctx)
 		if err != nil {
-			level.Error(logger).Log("msg", "error initiating obsctl tenant config", "error", err)
+			level.Error(logger).Log("msg", "error getting prometheus rules")
 			os.Exit(1)
 		}
-		err = ObsctlMetricsSet(ctx, tenantConfig, rules)
-		if err != nil {
-			level.Error(logger).Log("msg", "error setting rules", "error", err)
-			os.Exit(1)
+		tenantRules := GetTenantRules(prometheusRules)
+		for tenant, rules := range tenantRules {
+			tenantConfig, err := InitObsctlTenantConfig(ctx, tenant)
+			if err != nil {
+				level.Error(logger).Log("msg", "error initiating obsctl tenant config", "error", err)
+				os.Exit(1)
+			}
+			err = ObsctlMetricsSet(ctx, tenantConfig, rules)
+			if err != nil {
+				level.Error(logger).Log("msg", "error setting rules", "error", err)
+				os.Exit(1)
+			}
 		}
+		Sleep()
 	}
 }
