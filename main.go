@@ -139,9 +139,13 @@ func main() {
 	for tenant, rules := range tenantRules {
 		tenantConfig, err := InitObsctlTenantConfig(ctx, tenant)
 		if err != nil {
-			level.Error(logger).Log("msg", "error initiating obsctl tenant config")
+			level.Error(logger).Log("msg", "error initiating obsctl tenant config", "error", err)
 			os.Exit(1)
 		}
-		ObsctlMetricsSet(ctx, tenantConfig, rules)
+		err = ObsctlMetricsSet(ctx, tenantConfig, rules)
+		if err != nil {
+			level.Error(logger).Log("msg", "error setting rules", "error", err)
+			os.Exit(1)
+		}
 	}
 }
