@@ -13,7 +13,7 @@ login:
 	@$(CONTAINER_ENGINE) $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json login -u="${QUAY_USER}" -p="${QUAY_TOKEN}" quay.io
 
 build:
-	@$(CONTAINER_ENGINE) $(AUTH_FLAG)=$(DOCKER_CONF)/auth.json build -t $(IMAGE_NAME):latest .
+	@$(CONTAINER_ENGINE) build -t $(IMAGE_NAME):latest .
 	@$(CONTAINER_ENGINE) tag $(IMAGE_NAME):latest $(IMAGE_NAME):$(IMAGE_TAG)
 
 push:
@@ -23,6 +23,3 @@ push:
 deploy:
 	oc apply -f examples/prometheusrule.yaml
 	oc process -p IMAGE_TAG=$(IMAGE_TAG) -f openshift/template.yaml | oc apply -f -
-
-format:
-	@. ./venv/bin/activate && black run.py
