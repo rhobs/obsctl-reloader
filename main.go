@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/observatorium/obsctl/pkg/config"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringclient "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned"
+	"github.com/rhobs/obsctl-reloader/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -42,11 +44,22 @@ func GetPrometheusRules(ctx context.Context) ([]*monitoringv1.PrometheusRule, er
 
 func GetTenantRules(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
 	tenantRules := make(map[string][]monitoringv1.RuleGroup)
+	managedTenants := strings.Split(os.Getenv("MANAGED_TENANTS"), ",")
+	for _, tenant := range managedTenants {
+		tenantRules[tenant] = []monitoringv1.RuleGroup{}
+	}
+
 	for _, pr := range prometheusRules {
 		level.Info(logger).Log("msg", "checking prometheus rule for tenant", "name", pr.Name)
 		if tenant, ok := pr.Labels["tenant"]; ok {
+			if !utils.Contains(managedTenants, tenant) {
+				level.Info(logger).Log("msg", "skipping prometheus rule with unmanaged tenant", "name", pr.Name, "tenant", tenant)
+				continue
+			}
 			level.Info(logger).Log("msg", "checking prometheus rule tenant rules", "name", pr.Name, "tenant", tenant)
 			tenantRules[tenant] = append(tenantRules[tenant], pr.Spec.Groups...)
+		} else {
+			level.Info(logger).Log("msg", "skipping prometheus rule without tenant label", "name", pr.Name)
 		}
 	}
 
