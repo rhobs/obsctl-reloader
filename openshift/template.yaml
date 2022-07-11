@@ -38,7 +38,7 @@ objects:
     labels:
       app: obsctl-reloader
   spec:
-    replicas: 1
+    replicas: ${{REPLICAS}}
     selector:
       matchLabels:
         app: obsctl-reloader
@@ -94,3 +94,5 @@ parameters:
   value: "30"
 - name: MANAGED_TENANTS
   value: rhobs
+- name: REPLICAS
+  value: "1"
