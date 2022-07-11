@@ -18,7 +18,6 @@ import (
 	"github.com/observatorium/obsctl/pkg/config"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringclient "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned"
-	"github.com/rhobs/obsctl-reloader/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -54,7 +53,7 @@ func GetTenantRules(prometheusRules []*monitoringv1.PrometheusRule) map[string]m
 	for _, pr := range prometheusRules {
 		level.Info(logger).Log("msg", "checking prometheus rule for tenant", "name", pr.Name)
 		if tenant, ok := pr.Labels["tenant"]; ok {
-			if !utils.Contains(managedTenants, tenant) {
+			if _, found := tenantRules[tenant]; !found {
 				level.Info(logger).Log("msg", "skipping prometheus rule with unmanaged tenant", "name", pr.Name, "tenant", tenant)
 				continue
 			}
