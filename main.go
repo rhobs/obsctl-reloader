@@ -46,7 +46,9 @@ func GetTenantRules(prometheusRules []*monitoringv1.PrometheusRule) map[string]m
 	tenantRules := make(map[string][]monitoringv1.RuleGroup)
 	managedTenants := strings.Split(os.Getenv("MANAGED_TENANTS"), ",")
 	for _, tenant := range managedTenants {
-		tenantRules[tenant] = []monitoringv1.RuleGroup{}
+		if tenant != "" {
+			tenantRules[tenant] = []monitoringv1.RuleGroup{}
+		}
 	}
 
 	for _, pr := range prometheusRules {
