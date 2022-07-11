@@ -75,6 +75,8 @@ objects:
                 key: client_secret
           - name: SLEEP_DURATION_SECONDS
             value: "${SLEEP_DURATION_SECONDS}"
+          - name: MANAGED_TENANTS
+            value: ${MANAGED_TENANTS}
 parameters:
 - name: IMAGE
   value: quay.io/app-sre/obsctl-reloader
@@ -90,3 +92,5 @@ parameters:
   value: rhobs-tenant-staging
 - name: SLEEP_DURATION_SECONDS
   value: "30"
+- name: MANAGED_TENANTS
+  value: rhobs
