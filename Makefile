@@ -16,7 +16,7 @@ GIT ?= $(shell which git)
 SED ?= $(shell which gsed 2>/dev/null || which sed)
 
 define require_clean_work_tree
-	@git update-index -q --ignore-submodules --refresh
+    @git update-index -q --ignore-submodules --refresh
 
     @if ! git diff-files --quiet --ignore-submodules --; then \
         echo >&2 "$1: you have unstaged changes."; \

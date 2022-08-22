@@ -21,14 +21,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-const obsctlContextAPIName = "api"
-const defaultSleepDurationSeconds = 30
+const (
+	obsctlContextAPIName        = "api"
+	defaultSleepDurationSeconds = 30
+)
 
 // tenantRulesLoader represents logic for loading and filtering PrometheusRule objects by tenants.
 // Useful for testing without spinning up cluster.
 type tenantRulesLoader interface {
-	GetPrometheusRules() ([]*monitoringv1.PrometheusRule, error)
-	GetTenantRuleGroups(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec
+	getPrometheusRules() ([]*monitoringv1.PrometheusRule, error)
+	getTenantRuleGroups(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec
 }
 
 // kubeRulesLoader implements tenantRulesLoader interface.
@@ -37,7 +39,7 @@ type kubeRulesLoader struct {
 	logger log.Logger
 }
 
-func (k *kubeRulesLoader) GetPrometheusRules() ([]*monitoringv1.PrometheusRule, error) {
+func (k *kubeRulesLoader) getPrometheusRules() ([]*monitoringv1.PrometheusRule, error) {
 	client, err := monitoringclient.NewForConfig(ctrl.GetConfigOrDie())
 	if err != nil {
 		return nil, err
@@ -51,7 +53,7 @@ func (k *kubeRulesLoader) GetPrometheusRules() ([]*monitoringv1.PrometheusRule, 
 	return prometheusRules.Items, nil
 }
 
-func (k *kubeRulesLoader) GetTenantRuleGroups(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
+func (k *kubeRulesLoader) getTenantRuleGroups(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
 	tenantRules := make(map[string][]monitoringv1.RuleGroup)
 	managedTenants := strings.Split(os.Getenv("MANAGED_TENANTS"), ",")
 	for _, tenant := range managedTenants {
@@ -84,9 +86,9 @@ func (k *kubeRulesLoader) GetTenantRuleGroups(prometheusRules []*monitoringv1.Pr
 
 // tenantRulesSyncer implements logic for syncing rules to Observatorium API.
 type tenantRulesSyncer interface {
-	InitOrReloadObsctlConfig() error
-	SetCurrentTenant(tenant string) error
-	ObsctlMetricsSet(rules monitoringv1.PrometheusRuleSpec) error
+	initOrReloadObsctlConfig() error
+	setCurrentTenant(tenant string) error
+	obsctlMetricsSet(rules monitoringv1.PrometheusRuleSpec) error
 }
 
 // obsctlRulesSyncer implements tenantRulesSyncer.
@@ -99,7 +101,7 @@ type obsctlRulesSyncer struct {
 }
 
 // InitOrReloadObsctlConfig reads config from disk if present, or initializes one based on env vars.
-func (o *obsctlRulesSyncer) InitOrReloadObsctlConfig() error {
+func (o *obsctlRulesSyncer) initOrReloadObsctlConfig() error {
 	// Check if config is already present on disk.
 	cfg, err := config.Read(o.logger)
 	if err != nil {
@@ -149,7 +151,7 @@ func (o *obsctlRulesSyncer) InitOrReloadObsctlConfig() error {
 	return nil
 }
 
-func (o *obsctlRulesSyncer) SetCurrentTenant(tenant string) error {
+func (o *obsctlRulesSyncer) setCurrentTenant(tenant string) error {
 	if err := o.c.SetCurrentContext(o.logger, obsctlContextAPIName, tenant); err != nil {
 		level.Error(o.logger).Log("msg", "switching context", "tenant", tenant, "error", err)
 		return err
@@ -158,7 +160,7 @@ func (o *obsctlRulesSyncer) SetCurrentTenant(tenant string) error {
 	return nil
 }
 
-func (o *obsctlRulesSyncer) ObsctlMetricsSet(rules monitoringv1.PrometheusRuleSpec) error {
+func (o *obsctlRulesSyncer) obsctlMetricsSet(rules monitoringv1.PrometheusRuleSpec) error {
 	level.Info(o.logger).Log("msg", "setting metrics for tenant")
 	fc, currentTenant, err := fetcher.NewCustomFetcher(o.ctx, o.logger)
 	if err != nil {
@@ -189,25 +191,25 @@ func (o *obsctlRulesSyncer) ObsctlMetricsSet(rules monitoringv1.PrometheusRuleSp
 	return nil
 }
 
-// SyncLoop syncs PrometheusRule objects of each managed tenant with Observatorium API every SLEEP_DURATION_SECONDS.
-func SyncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o tenantRulesSyncer, sleepDurationSeconds int) {
+// syncLoop syncs PrometheusRule objects of each managed tenant with Observatorium API every SLEEP_DURATION_SECONDS.
+func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o tenantRulesSyncer, sleepDurationSeconds int) {
 	for {
 		select {
 		case <-time.After(time.Duration(sleepDurationSeconds) * time.Second):
-			prometheusRules, err := k.GetPrometheusRules()
+			prometheusRules, err := k.getPrometheusRules()
 			if err != nil {
 				level.Error(logger).Log("msg", "error getting prometheus rules", "error", err, "rules", len(prometheusRules))
 				os.Exit(1)
 			}
 
 			// Set each tenant as current and set rules.
-			for tenant, ruleGroups := range k.GetTenantRuleGroups(prometheusRules) {
-				if err := o.SetCurrentTenant(tenant); err != nil {
+			for tenant, ruleGroups := range k.getTenantRuleGroups(prometheusRules) {
+				if err := o.setCurrentTenant(tenant); err != nil {
 					level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
 					os.Exit(1)
 				}
 
-				err = o.ObsctlMetricsSet(ruleGroups)
+				err = o.obsctlMetricsSet(ruleGroups)
 				if err != nil {
 					level.Error(logger).Log("msg", "error setting rules", "tenant", tenant, "error", err)
 					os.Exit(1)
@@ -240,7 +242,7 @@ func main() {
 	}
 
 	// Initialize config.
-	if err := o.InitOrReloadObsctlConfig(); err != nil {
+	if err := o.initOrReloadObsctlConfig(); err != nil {
 		level.Error(logger).Log("msg", "error reloading/initializing obsctl config", "error", err)
 		os.Exit(1)
 	}
@@ -250,7 +252,7 @@ func main() {
 		sleepDurationSeconds, _ = strconv.Atoi(value)
 	}
 
-	SyncLoop(ctx, logger,
+	syncLoop(ctx, logger,
 		&kubeRulesLoader{
 			ctx:    ctx,
 			logger: log.With(logger, "component", "kube-rules-loader"),

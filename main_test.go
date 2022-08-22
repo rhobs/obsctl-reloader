@@ -17,11 +17,11 @@ import (
 
 type testRulesLoader struct{}
 
-func (r *testRulesLoader) GetPrometheusRules() ([]*monitoringv1.PrometheusRule, error) {
+func (r *testRulesLoader) getPrometheusRules() ([]*monitoringv1.PrometheusRule, error) {
 	return nil, nil
 }
 
-func (r *testRulesLoader) GetTenantRuleGroups(_ []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
+func (r *testRulesLoader) getTenantRuleGroups(_ []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
 	return map[string]monitoringv1.PrometheusRuleSpec{
 		"test": {},
 	}
@@ -31,15 +31,15 @@ type testRulesSyncer struct {
 	counter int
 }
 
-func (r *testRulesSyncer) InitOrReloadObsctlConfig() error {
+func (r *testRulesSyncer) initOrReloadObsctlConfig() error {
 	return nil
 }
 
-func (r *testRulesSyncer) SetCurrentTenant(tenant string) error {
+func (r *testRulesSyncer) setCurrentTenant(tenant string) error {
 	return nil
 }
 
-func (r *testRulesSyncer) ObsctlMetricsSet(rules monitoringv1.PrometheusRuleSpec) error {
+func (r *testRulesSyncer) obsctlMetricsSet(rules monitoringv1.PrometheusRuleSpec) error {
 	r.counter++
 	return nil
 }
@@ -51,9 +51,8 @@ func TestSyncLoop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(25*time.Second, func() { cancel() })
 
-	SyncLoop(ctx, log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), rl, rs, 5)
+	syncLoop(ctx, log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), rl, rs, 5)
 
-	// <-ctx.Done()
 	testutil.Equals(t, 4, rs.counter)
 }
 
@@ -78,6 +77,11 @@ func TestInitOrReloadObsctlConfig(t *testing.T) {
 		prexistingConfig *config.Config
 		wantConfig       *config.Config
 	}{
+		{
+			name:             "empty existing config",
+			prexistingConfig: &config.Config{},
+			tenants:          "test",
+		},
 		{
 			name: "already existing config with one tenant",
 			prexistingConfig: &config.Config{
@@ -187,13 +191,31 @@ func TestInitOrReloadObsctlConfig(t *testing.T) {
 			dir := t.TempDir()
 			testutil.Ok(t, os.Setenv("OBSCTL_CONFIG_PATH", path.Join(dir, "obsctl", "config.json")))
 			testutil.Ok(t, os.Setenv("MANAGED_TENANTS", tc.tenants))
-			if tc.prexistingConfig != nil && len(tc.prexistingConfig.APIs["api"].Contexts) != 0 {
+
+			// Handle test cases with pre-exisiting config.
+			if tc.prexistingConfig != nil {
 				testutil.Ok(t, tc.prexistingConfig.Save(o.logger))
-				testutil.Ok(t, o.InitOrReloadObsctlConfig())
-				testutil.Equals(t, tc.prexistingConfig.APIs, o.c.APIs)
-				testutil.Equals(t, tc.prexistingConfig.Current, o.c.Current)
+				testutil.Ok(t, o.initOrReloadObsctlConfig())
+
+				if len(tc.prexistingConfig.APIs["api"].Contexts) != 0 {
+					testutil.Equals(t, tc.prexistingConfig.APIs, o.c.APIs)
+					testutil.Equals(t, tc.prexistingConfig.Current, o.c.Current)
+				} else {
+					// Handle case where pre-existing config is empty.
+					testutil.Equals(t, map[string]config.APIConfig{
+						"api": {
+							URL: "http://yolo.com/",
+							Contexts: map[string]config.TenantConfig{
+								"test": {
+									OIDC:   testOIDC,
+									Tenant: "test",
+								},
+							},
+						},
+					}, o.c.APIs)
+				}
 			} else {
-				testutil.Ok(t, o.InitOrReloadObsctlConfig())
+				testutil.Ok(t, o.initOrReloadObsctlConfig())
 				testutil.Equals(t, tc.wantConfig, o.c)
 			}
 		})
@@ -328,7 +350,7 @@ func TestGetTenantRuleGroups(t *testing.T) {
 			},
 		},
 		{
-			name:    "multiple tenant with multiple rulegroups",
+			name:    "multiple tenants with multiple rulegroups",
 			tenants: "test,yolo",
 			input: []*monitoringv1.PrometheusRule{
 				{
@@ -428,7 +450,7 @@ func TestGetTenantRuleGroups(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			testutil.Ok(t, os.Setenv("MANAGED_TENANTS", tc.tenants))
-			testutil.Equals(t, tc.want, k.GetTenantRuleGroups(tc.input))
+			testutil.Equals(t, tc.want, k.getTenantRuleGroups(tc.input))
 		})
 	}
 }
