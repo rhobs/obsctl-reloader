@@ -3,14 +3,76 @@ kind: Template
 metadata:
   name: obsctl-reloader
 objects:
-- apiVersion: v1
-  kind: ServiceAccount
+- apiVersion: apps/v1
+  kind: Deployment
   metadata:
+    labels:
+      app.kubernetes.io/component: obsctl-reloader
+      app.kubernetes.io/instance: obsctl-reloader
+      app.kubernetes.io/name: obsctl-reloader
+      app.kubernetes.io/version: latest
     name: obsctl-reloader
+    namespace: observatorium-stage
+  spec:
+    replicas: ${REPLICAS}
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: obsctl-reloader
+        app.kubernetes.io/instance: obsctl-reloader
+        app.kubernetes.io/name: obsctl-reloader
+    strategy:
+      rollingUpdate:
+        maxSurge: 0
+        maxUnavailable: 1
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/component: obsctl-reloader
+          app.kubernetes.io/instance: obsctl-reloader
+          app.kubernetes.io/name: obsctl-reloader
+          app.kubernetes.io/version: latest
+      spec:
+        containers:
+        - env:
+          - name: NAMESPACE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: OBSERVATORIUM_URL
+            value: ${OBSERVATORIUM_URL}
+          - name: OIDC_AUDIENCE
+            value: ${OIDC_AUDIENCE}
+          - name: OIDC_ISSUER_URL
+            value: ${OIDC_ISSUER_URL}
+          - name: SLEEP_DURATION_SECONDS
+            value: ${SLEEP_DURATION_SECONDS}
+          - name: MANAGED_TENANTS
+            value: ${MANAGED_TENANTS}
+          - name: OIDC_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                key: client_id
+                name: ${OBSERVATORIUM_API_SECRET_NAME}
+          - name: OIDC_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: client_secret
+                name: ${OBSERVATORIUM_API_SECRET_NAME}
+          image: ${IMAGE}:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          name: obsctl-reloader
+          resources: {}
+        serviceAccountName: obsctl-reloader
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: Role
   metadata:
+    labels:
+      app.kubernetes.io/component: obsctl-reloader
+      app.kubernetes.io/instance: obsctl-reloader
+      app.kubernetes.io/name: obsctl-reloader
+      app.kubernetes.io/version: latest
     name: obsctl-reloader
+    namespace: observatorium-stage
   rules:
   - apiGroups:
     - monitoring.coreos.com
@@ -23,7 +85,13 @@ objects:
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
+    labels:
+      app.kubernetes.io/component: obsctl-reloader
+      app.kubernetes.io/instance: obsctl-reloader
+      app.kubernetes.io/name: obsctl-reloader
+      app.kubernetes.io/version: latest
     name: obsctl-reloader
+    namespace: observatorium-stage
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: Role
@@ -31,52 +99,16 @@ objects:
   subjects:
   - kind: ServiceAccount
     name: obsctl-reloader
-- apiVersion: apps/v1
-  kind: Deployment
+- apiVersion: v1
+  kind: ServiceAccount
   metadata:
-    name: obsctl-reloader
     labels:
-      app: obsctl-reloader
-  spec:
-    replicas: ${{REPLICAS}}
-    selector:
-      matchLabels:
-        app: obsctl-reloader
-    template:
-      metadata:
-        labels:
-          app: obsctl-reloader
-      spec:
-        serviceAccountName: obsctl-reloader
-        containers:
-        - name: obsctl
-          image: ${IMAGE}:${IMAGE_TAG}
-          imagePullPolicy: Always
-          env:
-          - name: NAMESPACE_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-          - name: OBSERVATORIUM_URL
-            value: ${OBSERVATORIUM_URL}
-          - name: OIDC_AUDIENCE
-            value: ${OIDC_AUDIENCE}
-          - name: OIDC_ISSUER_URL
-            value: ${OIDC_ISSUER_URL}
-          - name: OIDC_CLIENT_ID
-            valueFrom:
-              secretKeyRef:
-                name: ${OBSERVATORIUM_API_SECRET_NAME}
-                key: client_id
-          - name: OIDC_CLIENT_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: ${OBSERVATORIUM_API_SECRET_NAME}
-                key: client_secret
-          - name: SLEEP_DURATION_SECONDS
-            value: "${SLEEP_DURATION_SECONDS}"
-          - name: MANAGED_TENANTS
-            value: ${MANAGED_TENANTS}
+      app.kubernetes.io/component: obsctl-reloader
+      app.kubernetes.io/instance: obsctl-reloader
+      app.kubernetes.io/name: obsctl-reloader
+      app.kubernetes.io/version: latest
+    name: obsctl-reloader
+    namespace: observatorium-stage
 parameters:
 - name: IMAGE
   value: quay.io/app-sre/obsctl-reloader
