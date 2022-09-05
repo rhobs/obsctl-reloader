@@ -17,6 +17,8 @@ import (
 	"github.com/observatorium/obsctl/pkg/fetcher"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringclient "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned"
+	"github.com/prometheus/prometheus/pkg/rulefmt"
+	"gopkg.in/yaml.v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -168,12 +170,27 @@ func (o *obsctlRulesSyncer) obsctlMetricsSet(rules monitoringv1.PrometheusRuleSp
 		return err
 	}
 
-	body, err := json.Marshal(rules)
+	ruleGroups, err := json.Marshal(rules)
 	if err != nil {
-		level.Error(o.logger).Log("msg", "converting rules to json", "error", err)
+		level.Error(o.logger).Log("msg", "converting monitoringv1 rules to json", "error", err)
 		return err
 	}
 
+	groups, errs := rulefmt.Parse(ruleGroups)
+	if errs != nil || groups == nil {
+		for e := range errs {
+			level.Error(o.logger).Log("msg", "rulefmt parsing rules", "error", e, "groups", groups)
+		}
+		return errs[0]
+	}
+
+	body, err := yaml.Marshal(groups)
+	if err != nil {
+		level.Error(o.logger).Log("msg", "converting rulefmt rules to yaml", "error", err)
+		return err
+	}
+
+	level.Info(o.logger).Log("msg", "setting rule file", "rule", string(body))
 	resp, err := fc.SetRawRulesWithBodyWithResponse(o.ctx, currentTenant, "application/yaml", bytes.NewReader(body))
 	if err != nil {
 		level.Error(o.logger).Log("msg", "getting response", "error", err)
