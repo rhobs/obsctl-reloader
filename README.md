@@ -1,6 +1,6 @@
 # obsctl-reloader
 
-This tool uses [obsctl](https://github.com/observatorium/obsctl) to sync rules from PrometheusRules in a cluster.
+This tool uses [obsctl](https://github.com/observatorium/obsctl) to sync rules from your cluster to Observatorium [Rules API](https://observatorium.io/docs/design/rules-api.md/) via prometheus-operator’s [PrometheusRule CRD](https://prometheus-operator.dev/docs/operator/design/#prometheusrule).
 
 ## Usage
 
