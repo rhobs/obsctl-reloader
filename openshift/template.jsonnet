@@ -10,8 +10,15 @@ local or = (import '../jsonnet/lib/obsctl-reloader.libsonnet')({
     oidcIssuerURL: '${OIDC_ISSUER_URL}',
     sleepDurationSeconds: '${SLEEP_DURATION_SECONDS}',
     managedTenants: '${MANAGED_TENANTS}',
-    obsctlReloaderSecret: '${OBSERVATORIUM_API_SECRET_NAME}',
   },
+  tenantSecretMap: [
+    {
+      tenant: 'RHOBS',
+      secret: '${RHOBS_SECRET_NAME}',
+      idKey: 'client_id',
+      secretKey: 'client_secret',
+    },
+  ],
 });
 {
   apiVersion: 'template.openshift.io/v1',
@@ -28,8 +35,8 @@ local or = (import '../jsonnet/lib/obsctl-reloader.libsonnet')({
     { name: 'OBSERVATORIUM_URL', value: 'https://observatorium.api.stage.openshift.com' },
     { name: 'OIDC_AUDIENCE', value: 'observatorium' },
     { name: 'OIDC_ISSUER_URL', value: 'https://sso.redhat.com/auth/realms/redhat-external' },
-    { name: 'OBSERVATORIUM_API_SECRET_NAME', value: 'rhobs-tenant-staging' },
-    { name: 'SLEEP_DURATION_SECONDS', value: '30' },
+    { name: 'RHOBS_SECRET_NAME', value: 'rhobs-tenant-staging' },
+    { name: 'SLEEP_DURATION_SECONDS', value: 30 },
     { name: 'MANAGED_TENANTS', value: 'rhobs' },
     { name: 'REPLICAS', value: '1' },
   ],
