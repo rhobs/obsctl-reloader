@@ -25,7 +25,7 @@ import (
 
 const (
 	obsctlContextAPIName        = "api"
-	defaultSleepDurationSeconds = 30
+	defaultSleepDurationSeconds = 15
 )
 
 // tenantRulesLoader represents logic for loading and filtering PrometheusRule objects by tenants.
@@ -257,7 +257,7 @@ func parseFlags() *cfg {
 	cfg := &cfg{}
 
 	// Common flags.
-	flag.UintVar(&cfg.sleepDurationSeconds, "sleep-duration-seconds", 15, "The interval in seconds after which all PrometheusRules are synced to Observatorium API.")
+	flag.UintVar(&cfg.sleepDurationSeconds, "sleep-duration-seconds", defaultSleepDurationSeconds, "The interval in seconds after which all PrometheusRules are synced to Observatorium API.")
 	flag.StringVar(&cfg.observatoriumURL, "observatorium-api-url", "", "The URL of the Observatorium API to which rules will be synced.")
 	flag.StringVar(&cfg.managedTenants, "managed-tenants", "", "The name of the tenants whose rules should be synced. If there are multiple tenants, ensure they are comma-separated.")
 	flag.StringVar(&cfg.issuerURL, "issuer-url", "", "The OIDC issuer URL, see https://openid.net/specs/openid-connect-discovery-1_0.html#IssuerDiscovery.")

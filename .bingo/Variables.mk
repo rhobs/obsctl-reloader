@@ -53,6 +53,12 @@ $(JSONNETFMT): $(BINGO_DIR)/jsonnetfmt.mod
 	@echo "(re)installing $(GOBIN)/jsonnetfmt-v0.16.0"
 	@cd $(BINGO_DIR) && $(GO) build -mod=mod -modfile=jsonnetfmt.mod -o=$(GOBIN)/jsonnetfmt-v0.16.0 "github.com/google/go-jsonnet/cmd/jsonnetfmt"
 
+MDOX := $(GOBIN)/mdox-v0.9.0
+$(MDOX): $(BINGO_DIR)/mdox.mod
+	@# Install binary/ries using Go 1.14+ build command. This is using bwplotka/bingo-controlled, separate go module with pinned dependencies.
+	@echo "(re)installing $(GOBIN)/mdox-v0.9.0"
+	@cd $(BINGO_DIR) && $(GO) build -mod=mod -modfile=mdox.mod -o=$(GOBIN)/mdox-v0.9.0 "github.com/bwplotka/mdox"
+
 MISSPELL := $(GOBIN)/misspell-v0.3.4
 $(MISSPELL): $(BINGO_DIR)/misspell.mod
 	@# Install binary/ries using Go 1.14+ build command. This is using bwplotka/bingo-controlled, separate go module with pinned dependencies.
