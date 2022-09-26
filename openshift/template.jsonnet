@@ -23,9 +23,8 @@ local or = (import '../jsonnet/lib/obsctl-reloader.libsonnet')({
       secret: '${OSD_SECRET_NAME}',
       idKey: 'client-id',
       secretKey: 'client-secret',
-      optional: true
+      optional: true,
     },
-
   ],
 });
 {
