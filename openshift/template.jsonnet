@@ -18,6 +18,14 @@ local or = (import '../jsonnet/lib/obsctl-reloader.libsonnet')({
       idKey: 'client_id',
       secretKey: 'client_secret',
     },
+    {
+      tenant: 'OSD',
+      secret: '${OSD_SECRET_NAME}',
+      idKey: 'client-id',
+      secretKey: 'client-secret',
+      optional: true
+    },
+
   ],
 });
 {

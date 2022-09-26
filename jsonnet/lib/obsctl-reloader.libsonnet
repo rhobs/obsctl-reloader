@@ -135,6 +135,7 @@ function(params) {
                     secretKeyRef: {
                       name: t.secret,
                       key: t.idKey,
+                      [if std.objectHas(t, 'optional') then 'optional' else null]: true,
                     },
                   },
                 }
@@ -146,6 +147,7 @@ function(params) {
                     secretKeyRef: {
                       name: t.secret,
                       key: t.secretKey,
+                      [if std.objectHas(t, 'optional') then 'optional' else null]: true,
                     },
                   },
                 }
