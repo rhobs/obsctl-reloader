@@ -10,6 +10,7 @@ local defaults = {
   imagePullPolicy: 'IfNotPresent',
   replicas: error 'must provide replicas',
   env: error 'must provide env',
+  tenantSecretMap: error 'must provide tenantSecretMap',
   resources: {},
 
   commonLabels:: {
@@ -34,6 +35,7 @@ function(params) {
   // Safety checks for combined config of defaults and params
   assert std.isObject(or.config.resources),
   assert std.isObject(or.config.env),
+  assert std.isArray(or.config.tenantSecretMap),
 
   serviceAccount: {
     apiVersion: 'v1',
@@ -109,6 +111,13 @@ function(params) {
               name: 'obsctl-reloader',
               image: or.config.image,
               imagePullPolicy: or.config.imagePullPolicy,
+              args: [
+                '--sleep-duration-seconds=%s' % or.config.env.sleepDurationSeconds,
+                '--observatorium-api-url=%s' % or.config.env.observatoriumURL,
+                '--managed-tenants=%s' % or.config.env.managedTenants,
+                '--issuer-url=%s' % or.config.env.oidcIssuerURL,
+                '--audience=%s' % or.config.env.oidcAudience,
+              ],
               resources: if or.config.resources != {} then or.config.resources else {},
               env: [
                 {
@@ -119,44 +128,30 @@ function(params) {
                     },
                   },
                 },
+              ] + [
                 {
-                  name: 'OBSERVATORIUM_URL',
-                  value: or.config.env.observatoriumURL,
-                },
-                {
-                  name: 'OIDC_AUDIENCE',
-                  value: or.config.env.oidcAudience,
-                },
-                {
-                  name: 'OIDC_ISSUER_URL',
-                  value: or.config.env.oidcIssuerURL,
-                },
-                {
-                  name: 'SLEEP_DURATION_SECONDS',
-                  value: or.config.env.sleepDurationSeconds,
-                },
-                {
-                  name: 'MANAGED_TENANTS',
-                  value: or.config.env.managedTenants,
-                },
-                {
-                  name: 'OIDC_CLIENT_ID',
+                  name: t.tenant + '_CLIENT_ID',
                   valueFrom: {
                     secretKeyRef: {
-                      name: or.config.env.obsctlReloaderSecret,
-                      key: 'client_id',
+                      name: t.secret,
+                      key: t.idKey,
+                      [if std.objectHas(t, 'optional') then 'optional' else null]: true,
                     },
                   },
-                },
+                }
+                for t in or.config.tenantSecretMap
+              ] + [
                 {
-                  name: 'OIDC_CLIENT_SECRET',
+                  name: t.tenant + '_CLIENT_SECRET',
                   valueFrom: {
                     secretKeyRef: {
-                      name: or.config.env.obsctlReloaderSecret,
-                      key: 'client_secret',
+                      name: t.secret,
+                      key: t.secretKey,
+                      [if std.objectHas(t, 'optional') then 'optional' else null]: true,
                     },
                   },
-                },
+                }
+                for t in or.config.tenantSecretMap
               ],
             },
           ],

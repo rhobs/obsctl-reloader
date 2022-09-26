@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -25,7 +25,7 @@ import (
 
 const (
 	obsctlContextAPIName        = "api"
-	defaultSleepDurationSeconds = 30
+	defaultSleepDurationSeconds = 15
 )
 
 // tenantRulesLoader represents logic for loading and filtering PrometheusRule objects by tenants.
@@ -37,8 +37,9 @@ type tenantRulesLoader interface {
 
 // kubeRulesLoader implements tenantRulesLoader interface.
 type kubeRulesLoader struct {
-	ctx    context.Context
-	logger log.Logger
+	ctx            context.Context
+	logger         log.Logger
+	managedTenants string
 }
 
 func (k *kubeRulesLoader) getPrometheusRules() ([]*monitoringv1.PrometheusRule, error) {
@@ -57,7 +58,7 @@ func (k *kubeRulesLoader) getPrometheusRules() ([]*monitoringv1.PrometheusRule, 
 
 func (k *kubeRulesLoader) getTenantRuleGroups(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
 	tenantRules := make(map[string][]monitoringv1.RuleGroup)
-	managedTenants := strings.Split(os.Getenv("MANAGED_TENANTS"), ",")
+	managedTenants := strings.Split(k.managedTenants, ",")
 	for _, tenant := range managedTenants {
 		if tenant != "" {
 			tenantRules[tenant] = []monitoringv1.RuleGroup{}
@@ -99,6 +100,11 @@ type obsctlRulesSyncer struct {
 	logger          log.Logger
 	skipClientCheck bool
 
+	apiURL         string
+	audience       string
+	issuerURL      string
+	managedTenants string
+
 	c *config.Config
 }
 
@@ -110,7 +116,7 @@ func (o *obsctlRulesSyncer) initOrReloadObsctlConfig() error {
 		return err
 	}
 
-	if len(cfg.APIs[obsctlContextAPIName].Contexts) != 0 && cfg.APIs[obsctlContextAPIName].URL == os.Getenv("OBSERVATORIUM_URL") {
+	if len(cfg.APIs[obsctlContextAPIName].Contexts) != 0 && cfg.APIs[obsctlContextAPIName].URL == o.apiURL {
 		o.c = cfg
 		level.Info(o.logger).Log("msg", "loading config from disk")
 		return nil
@@ -120,21 +126,20 @@ func (o *obsctlRulesSyncer) initOrReloadObsctlConfig() error {
 
 	// No previous config present,
 	// Add API.
-	api := os.Getenv("OBSERVATORIUM_URL")
 	o.c = &config.Config{}
-	if err := o.c.AddAPI(o.logger, obsctlContextAPIName, api); err != nil {
+	if err := o.c.AddAPI(o.logger, obsctlContextAPIName, o.apiURL); err != nil {
 		level.Error(o.logger).Log("msg", "add api", "error", err)
 		return err
 	}
 
 	// Add all managed tenants under the API.
-	for _, tenant := range strings.Split(os.Getenv("MANAGED_TENANTS"), ",") {
+	for _, tenant := range strings.Split(o.managedTenants, ",") {
 		tenantCfg := config.TenantConfig{OIDC: new(config.OIDCConfig)}
 		tenantCfg.Tenant = tenant
-		tenantCfg.OIDC.Audience = os.Getenv("OIDC_AUDIENCE")
-		tenantCfg.OIDC.ClientID = os.Getenv("OIDC_CLIENT_ID")
-		tenantCfg.OIDC.ClientSecret = os.Getenv("OIDC_CLIENT_SECRET")
-		tenantCfg.OIDC.IssuerURL = os.Getenv("OIDC_ISSUER_URL")
+		tenantCfg.OIDC.Audience = o.audience
+		tenantCfg.OIDC.ClientID = os.Getenv(strings.ToUpper(tenant) + "_CLIENT_ID")
+		tenantCfg.OIDC.ClientSecret = os.Getenv(strings.ToUpper(tenant) + "_CLIENT_SECRET")
+		tenantCfg.OIDC.IssuerURL = o.issuerURL
 
 		if !o.skipClientCheck {
 			// We create a client here to check if config is valid for a particular managed tenant.
@@ -209,7 +214,7 @@ func (o *obsctlRulesSyncer) obsctlMetricsSet(rules monitoringv1.PrometheusRuleSp
 }
 
 // syncLoop syncs PrometheusRule objects of each managed tenant with Observatorium API every SLEEP_DURATION_SECONDS.
-func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o tenantRulesSyncer, sleepDurationSeconds int) {
+func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o tenantRulesSyncer, sleepDurationSeconds uint) {
 	for {
 		select {
 		case <-time.After(time.Duration(sleepDurationSeconds) * time.Second):
@@ -240,7 +245,31 @@ func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o ten
 	}
 }
 
+type cfg struct {
+	observatoriumURL     string
+	sleepDurationSeconds uint
+	managedTenants       string
+	audience             string
+	issuerURL            string
+}
+
+func parseFlags() *cfg {
+	cfg := &cfg{}
+
+	// Common flags.
+	flag.UintVar(&cfg.sleepDurationSeconds, "sleep-duration-seconds", defaultSleepDurationSeconds, "The interval in seconds after which all PrometheusRules are synced to Observatorium API.")
+	flag.StringVar(&cfg.observatoriumURL, "observatorium-api-url", "", "The URL of the Observatorium API to which rules will be synced.")
+	flag.StringVar(&cfg.managedTenants, "managed-tenants", "", "The name of the tenants whose rules should be synced. If there are multiple tenants, ensure they are comma-separated.")
+	flag.StringVar(&cfg.issuerURL, "issuer-url", "", "The OIDC issuer URL, see https://openid.net/specs/openid-connect-discovery-1_0.html#IssuerDiscovery.")
+	flag.StringVar(&cfg.audience, "audience", "", "The audience for whom the access token is intended, see https://openid.net/specs/openid-connect-core-1_0.html#IDToken.")
+
+	flag.Parse()
+	return cfg
+}
+
 func main() {
+	cfg := parseFlags()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -254,8 +283,12 @@ func main() {
 	logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 
 	o := &obsctlRulesSyncer{
-		ctx:    ctx,
-		logger: log.With(logger, "component", "obsctl-syncer"),
+		ctx:            ctx,
+		logger:         log.With(logger, "component", "obsctl-syncer"),
+		apiURL:         cfg.observatoriumURL,
+		audience:       cfg.audience,
+		issuerURL:      cfg.issuerURL,
+		managedTenants: cfg.managedTenants,
 	}
 
 	// Initialize config.
@@ -264,16 +297,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	sleepDurationSeconds := defaultSleepDurationSeconds
-	if value, ok := os.LookupEnv("SLEEP_DURATION_SECONDS"); ok {
-		sleepDurationSeconds, _ = strconv.Atoi(value)
-	}
-
 	syncLoop(ctx, logger,
 		&kubeRulesLoader{
-			ctx:    ctx,
-			logger: log.With(logger, "component", "kube-rules-loader"),
+			ctx:            ctx,
+			logger:         log.With(logger, "component", "kube-rules-loader"),
+			managedTenants: cfg.managedTenants,
 		}, o,
-		sleepDurationSeconds,
+		cfg.sleepDurationSeconds,
 	)
 }

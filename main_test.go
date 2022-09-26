@@ -57,12 +57,18 @@ func TestSyncLoop(t *testing.T) {
 }
 
 func TestInitOrReloadObsctlConfig(t *testing.T) {
-	o := &obsctlRulesSyncer{ctx: context.TODO(), logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), skipClientCheck: true}
-	testutil.Ok(t, os.Setenv("OBSERVATORIUM_URL", "http://yolo.com/"))
-	testutil.Ok(t, os.Setenv("OIDC_AUDIENCE", "test"))
-	testutil.Ok(t, os.Setenv("OIDC_CLIENT_ID", "test"))
-	testutil.Ok(t, os.Setenv("OIDC_CLIENT_SECRET", "test"))
-	testutil.Ok(t, os.Setenv("OIDC_ISSUER_URL", "http://yolo-auth.com"))
+	o := &obsctlRulesSyncer{
+		ctx:             context.TODO(),
+		logger:          log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		skipClientCheck: true,
+		audience:        "test",
+		apiURL:          "http://yolo.com/",
+		issuerURL:       "http://yolo-auth.com",
+	}
+	testutil.Ok(t, os.Setenv("TEST_CLIENT_ID", "test"))
+	testutil.Ok(t, os.Setenv("TEST_CLIENT_SECRET", "test"))
+	testutil.Ok(t, os.Setenv("YOLO_CLIENT_ID", "test"))
+	testutil.Ok(t, os.Setenv("YOLO_CLIENT_SECRET", "test"))
 
 	testOIDC := &config.OIDCConfig{
 		Audience:     "test",
@@ -190,10 +196,10 @@ func TestInitOrReloadObsctlConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			testutil.Ok(t, os.Setenv("OBSCTL_CONFIG_PATH", path.Join(dir, "obsctl", "config.json")))
-			testutil.Ok(t, os.Setenv("MANAGED_TENANTS", tc.tenants))
 
 			// Handle test cases with pre-exisiting config.
 			if tc.prexistingConfig != nil {
+				o.managedTenants = tc.tenants
 				testutil.Ok(t, tc.prexistingConfig.Save(o.logger))
 				testutil.Ok(t, o.initOrReloadObsctlConfig())
 
@@ -215,6 +221,7 @@ func TestInitOrReloadObsctlConfig(t *testing.T) {
 					}, o.c.APIs)
 				}
 			} else {
+				o.managedTenants = tc.tenants
 				testutil.Ok(t, o.initOrReloadObsctlConfig())
 				testutil.Equals(t, tc.wantConfig, o.c)
 			}
@@ -449,7 +456,7 @@ func TestGetTenantRuleGroups(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			testutil.Ok(t, os.Setenv("MANAGED_TENANTS", tc.tenants))
+			k.managedTenants = tc.tenants
 			testutil.Equals(t, tc.want, k.getTenantRuleGroups(tc.input))
 		})
 	}

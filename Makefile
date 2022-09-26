@@ -5,6 +5,7 @@ export GO111MODULE
 
 FILES_TO_FMT      	 ?= $(shell find . -path ./vendor -prune -o -name '*.go' -print)
 JSONNET_SRC = $(shell find . -type f -not -path './*vendor_jsonnet/*' \( -name '*.libsonnet' -o -name '*.jsonnet' \))
+MDOX_VALIDATE_CONFIG ?= .mdox.validate.yaml
 
 GOBIN ?= $(firstword $(subst :, ,${GOPATH}))/bin
 
@@ -66,6 +67,11 @@ deps: ## Ensures fresh go.mod and go.sum.
 	@go mod tidy
 	@go mod verify
 
+.PHONY: gobuild
+gobuild: check-git deps ## Build obsctl-reloader.
+	@echo ">> building obsctl-reloader"
+	@GOBIN=$(GOBIN) go install github.com/rhobs/obsctl-reloader
+
 .PHONY: format
 format: ## Formats Go and jsonnet.
 format: $(GOIMPORTS) $(JSONNET_SRC) $(JSONNETFMT)
@@ -89,6 +95,16 @@ ifneq ($(GIT),)
 else
 	@echo >&2 "No git binary found."; exit 1
 endif
+
+.PHONY: docs
+docs: gobuild $(MDOX) ## Generates config snippets and doc formatting.
+	@echo ">> generating docs $(PATH)"
+	PATH=${PATH}:$(GOBIN) $(MDOX) fmt -l --links.validate.config-file=$(MDOX_VALIDATE_CONFIG) *.md
+
+.PHONY: check-docs
+check-docs: gobuild $(MDOX) ## Checks docs for discrepancies in formatting and links.
+	@echo ">> checking formatting and links $(PATH)"
+	PATH=${PATH}:$(GOBIN) $(MDOX) fmt --check -l --links.validate.config-file=$(MDOX_VALIDATE_CONFIG) *.md
 
 # PROTIP:
 # Add
