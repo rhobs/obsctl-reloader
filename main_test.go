@@ -9,6 +9,7 @@ import (
 
 	"github.com/efficientgo/tools/core/pkg/testutil"
 	"github.com/go-kit/log"
+	lokiv1beta1 "github.com/grafana/loki/operator/apis/loki/v1beta1"
 	"github.com/observatorium/obsctl/pkg/config"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,18 +18,40 @@ import (
 
 type testRulesLoader struct{}
 
+func (r *testRulesLoader) getLokiAlertingRules() ([]lokiv1beta1.AlertingRule, error) {
+	return nil, nil
+}
+
+func (r *testRulesLoader) getLokiRecordingRules() ([]lokiv1beta1.RecordingRule, error) {
+	return nil, nil
+}
+
 func (r *testRulesLoader) getPrometheusRules() ([]*monitoringv1.PrometheusRule, error) {
 	return nil, nil
 }
 
-func (r *testRulesLoader) getTenantRuleGroups(_ []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
+func (k *testRulesLoader) getTenantLogsAlertingRuleGroups(alertingRules []lokiv1beta1.AlertingRule) map[string]lokiv1beta1.AlertingRuleSpec {
+	return map[string]lokiv1beta1.AlertingRuleSpec{
+		"test": {},
+	}
+}
+
+func (k *testRulesLoader) getTenantLogsRecordingRuleGroups(recordingRules []lokiv1beta1.RecordingRule) map[string]lokiv1beta1.RecordingRuleSpec {
+	return map[string]lokiv1beta1.RecordingRuleSpec{
+		"test": {},
+	}
+}
+
+func (r *testRulesLoader) getTenantMetricsRuleGroups(_ []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
 	return map[string]monitoringv1.PrometheusRuleSpec{
 		"test": {},
 	}
 }
 
 type testRulesSyncer struct {
-	counter int
+	setCurrentTenantCnt int
+	logsRulesCnt        int
+	metricsRulesCnt     int
 }
 
 func (r *testRulesSyncer) initOrReloadObsctlConfig() error {
@@ -36,11 +59,22 @@ func (r *testRulesSyncer) initOrReloadObsctlConfig() error {
 }
 
 func (r *testRulesSyncer) setCurrentTenant(tenant string) error {
+	r.setCurrentTenantCnt++
+	return nil
+}
+
+func (r *testRulesSyncer) obsctlLogsAlertingSet(rules lokiv1beta1.AlertingRuleSpec) error {
+	r.logsRulesCnt++
+	return nil
+}
+
+func (r *testRulesSyncer) obsctlLogsRecordingSet(rules lokiv1beta1.RecordingRuleSpec) error {
+	r.logsRulesCnt++
 	return nil
 }
 
 func (r *testRulesSyncer) obsctlMetricsSet(rules monitoringv1.PrometheusRuleSpec) error {
-	r.counter++
+	r.metricsRulesCnt++
 	return nil
 }
 
@@ -53,7 +87,9 @@ func TestSyncLoop(t *testing.T) {
 
 	syncLoop(ctx, log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), rl, rs, 5)
 
-	testutil.Equals(t, 4, rs.counter)
+	testutil.Equals(t, 12, rs.setCurrentTenantCnt)
+	testutil.Equals(t, 4, rs.metricsRulesCnt)
+	testutil.Equals(t, 8, rs.logsRulesCnt)
 }
 
 func TestInitOrReloadObsctlConfig(t *testing.T) {
@@ -229,7 +265,7 @@ func TestInitOrReloadObsctlConfig(t *testing.T) {
 	}
 }
 
-func TestGetTenantRuleGroups(t *testing.T) {
+func TestGetTenantMetricsRuleGroups(t *testing.T) {
 	k := &kubeRulesLoader{ctx: context.TODO(), logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))}
 
 	for _, tc := range []struct {
@@ -457,7 +493,481 @@ func TestGetTenantRuleGroups(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			k.managedTenants = tc.tenants
-			testutil.Equals(t, tc.want, k.getTenantRuleGroups(tc.input))
+			testutil.Equals(t, tc.want, k.getTenantMetricsRuleGroups(tc.input))
+		})
+	}
+}
+
+func TestGetTenantLokiAlertingRuleGroups(t *testing.T) {
+	k := &kubeRulesLoader{ctx: context.TODO(), logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))}
+
+	for _, tc := range []struct {
+		name    string
+		tenants string
+		input   []lokiv1beta1.AlertingRule
+		want    map[string]lokiv1beta1.AlertingRuleSpec
+	}{
+		{
+			name:    "no rules and no tenants",
+			tenants: "",
+			input:   []lokiv1beta1.AlertingRule{},
+			want:    map[string]lokiv1beta1.AlertingRuleSpec{},
+		},
+		{
+			name:    "no rules and one tenant",
+			tenants: "test",
+			input:   []lokiv1beta1.AlertingRule{},
+			want:    map[string]lokiv1beta1.AlertingRuleSpec{"test": {Groups: []*lokiv1beta1.AlertingRuleGroup{}}},
+		},
+		{
+			name:    "one tenant with one rulegroup",
+			tenants: "test",
+			input: []lokiv1beta1.AlertingRule{
+				{
+					Spec: lokiv1beta1.AlertingRuleSpec{
+						TenantID: "test",
+						Groups: []*lokiv1beta1.AlertingRuleGroup{
+							{
+								Name:     "TestGroup",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+									{
+										Alert: "TestAlertingRule",
+										Expr:  "1 > 0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: map[string]lokiv1beta1.AlertingRuleSpec{
+				"test": {
+					Groups: []*lokiv1beta1.AlertingRuleGroup{
+						{
+							Name:     "TestGroup",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+								{
+									Alert: "TestAlertingRule",
+									Expr:  "1 > 0",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "one tenant with multiple rulegroup",
+			tenants: "test",
+			input: []lokiv1beta1.AlertingRule{
+				{
+					Spec: lokiv1beta1.AlertingRuleSpec{
+						TenantID: "test",
+						Groups: []*lokiv1beta1.AlertingRuleGroup{
+							{
+								Name:     "TestGroup0",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+									{
+										Alert: "TestAlertingRule0",
+										Expr:  "1 > 0",
+									},
+								},
+							},
+							{
+								Name:     "TestGroup1",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+									{
+										Alert: "TestAlertingRule1",
+										Expr:  "1 > 0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: map[string]lokiv1beta1.AlertingRuleSpec{
+				"test": {
+					Groups: []*lokiv1beta1.AlertingRuleGroup{
+						{
+							Name:     "TestGroup0",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+								{
+									Alert: "TestAlertingRule0",
+									Expr:  "1 > 0",
+								},
+							},
+						},
+						{
+							Name:     "TestGroup1",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+								{
+									Alert: "TestAlertingRule1",
+									Expr:  "1 > 0",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "multiple tenant with multiple rulegroup",
+			tenants: "test,yolo",
+			input: []lokiv1beta1.AlertingRule{
+				{
+					Spec: lokiv1beta1.AlertingRuleSpec{
+						TenantID: "test",
+						Groups: []*lokiv1beta1.AlertingRuleGroup{
+							{
+								Name:     "TestGroup0",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+									{
+										Alert: "TestAlertingRule0",
+										Expr:  "1 > 0",
+									},
+								},
+							},
+							{
+								Name:     "TestGroup1",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+									{
+										Alert: "TestAlertingRule1",
+										Expr:  "1 > 0",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Spec: lokiv1beta1.AlertingRuleSpec{
+						TenantID: "yolo",
+						Groups: []*lokiv1beta1.AlertingRuleGroup{
+							{
+								Name:     "YoloGroup0",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+									{
+										Alert: "YoloAlertingRule0",
+										Expr:  "1 > 0",
+									},
+								},
+							},
+							{
+								Name:     "YoloGroup1",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+									{
+										Alert: "YoloAlertingRule1",
+										Expr:  "1 > 0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: map[string]lokiv1beta1.AlertingRuleSpec{
+				"test": {
+					Groups: []*lokiv1beta1.AlertingRuleGroup{
+						{
+							Name:     "TestGroup0",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+								{
+									Alert: "TestAlertingRule0",
+									Expr:  "1 > 0",
+								},
+							},
+						},
+						{
+							Name:     "TestGroup1",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+								{
+									Alert: "TestAlertingRule1",
+									Expr:  "1 > 0",
+								},
+							},
+						},
+					},
+				},
+				"yolo": {
+					Groups: []*lokiv1beta1.AlertingRuleGroup{
+						{
+							Name:     "YoloGroup0",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+								{
+									Alert: "YoloAlertingRule0",
+									Expr:  "1 > 0",
+								},
+							},
+						},
+						{
+							Name:     "YoloGroup1",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.AlertingRuleGroupSpec{
+								{
+									Alert: "YoloAlertingRule1",
+									Expr:  "1 > 0",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			k.managedTenants = tc.tenants
+			testutil.Equals(t, tc.want, k.getTenantLogsAlertingRuleGroups(tc.input))
+		})
+	}
+}
+
+func TestGetTenantLokiRecordingRuleGroups(t *testing.T) {
+	k := &kubeRulesLoader{ctx: context.TODO(), logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))}
+
+	for _, tc := range []struct {
+		name    string
+		tenants string
+		input   []lokiv1beta1.RecordingRule
+		want    map[string]lokiv1beta1.RecordingRuleSpec
+	}{
+		{
+			name:    "no rules and no tenants",
+			tenants: "",
+			input:   []lokiv1beta1.RecordingRule{},
+			want:    map[string]lokiv1beta1.RecordingRuleSpec{},
+		},
+		{
+			name:    "no rules and one tenant",
+			tenants: "test",
+			input:   []lokiv1beta1.RecordingRule{},
+			want:    map[string]lokiv1beta1.RecordingRuleSpec{"test": {Groups: []*lokiv1beta1.RecordingRuleGroup{}}},
+		},
+		{
+			name:    "one tenant with one rulegroup",
+			tenants: "test",
+			input: []lokiv1beta1.RecordingRule{
+				{
+					Spec: lokiv1beta1.RecordingRuleSpec{
+						TenantID: "test",
+						Groups: []*lokiv1beta1.RecordingRuleGroup{
+							{
+								Name:     "TestGroup",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+									{
+										Record: "TestRecordingRule",
+										Expr:   "1 > 0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: map[string]lokiv1beta1.RecordingRuleSpec{
+				"test": {
+					Groups: []*lokiv1beta1.RecordingRuleGroup{
+						{
+							Name:     "TestGroup",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+								{
+									Record: "TestRecordingRule",
+									Expr:   "1 > 0",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "one tenant with multiple rulegroup",
+			tenants: "test",
+			input: []lokiv1beta1.RecordingRule{
+				{
+					Spec: lokiv1beta1.RecordingRuleSpec{
+						TenantID: "test",
+						Groups: []*lokiv1beta1.RecordingRuleGroup{
+							{
+								Name:     "TestGroup0",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+									{
+										Record: "TestRecordingRule0",
+										Expr:   "1 > 0",
+									},
+								},
+							},
+							{
+								Name:     "TestGroup1",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+									{
+										Record: "TestRecordingRule1",
+										Expr:   "1 > 0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: map[string]lokiv1beta1.RecordingRuleSpec{
+				"test": {
+					Groups: []*lokiv1beta1.RecordingRuleGroup{
+						{
+							Name:     "TestGroup0",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+								{
+									Record: "TestRecordingRule0",
+									Expr:   "1 > 0",
+								},
+							},
+						},
+						{
+							Name:     "TestGroup1",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+								{
+									Record: "TestRecordingRule1",
+									Expr:   "1 > 0",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "multiple tenant with multiple rulegroup",
+			tenants: "test,yolo",
+			input: []lokiv1beta1.RecordingRule{
+				{
+					Spec: lokiv1beta1.RecordingRuleSpec{
+						TenantID: "test",
+						Groups: []*lokiv1beta1.RecordingRuleGroup{
+							{
+								Name:     "TestGroup0",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+									{
+										Record: "TestRecordingRule0",
+										Expr:   "1 > 0",
+									},
+								},
+							},
+							{
+								Name:     "TestGroup1",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+									{
+										Record: "TestRecordingRule1",
+										Expr:   "1 > 0",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Spec: lokiv1beta1.RecordingRuleSpec{
+						TenantID: "yolo",
+						Groups: []*lokiv1beta1.RecordingRuleGroup{
+							{
+								Name:     "YoloGroup0",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+									{
+										Record: "YoloRecordingRule0",
+										Expr:   "1 > 0",
+									},
+								},
+							},
+							{
+								Name:     "YoloGroup1",
+								Interval: "30s",
+								Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+									{
+										Record: "YoloRecordingRule1",
+										Expr:   "1 > 0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: map[string]lokiv1beta1.RecordingRuleSpec{
+				"test": {
+					Groups: []*lokiv1beta1.RecordingRuleGroup{
+						{
+							Name:     "TestGroup0",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+								{
+									Record: "TestRecordingRule0",
+									Expr:   "1 > 0",
+								},
+							},
+						},
+						{
+							Name:     "TestGroup1",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+								{
+									Record: "TestRecordingRule1",
+									Expr:   "1 > 0",
+								},
+							},
+						},
+					},
+				},
+				"yolo": {
+					Groups: []*lokiv1beta1.RecordingRuleGroup{
+						{
+							Name:     "YoloGroup0",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+								{
+									Record: "YoloRecordingRule0",
+									Expr:   "1 > 0",
+								},
+							},
+						},
+						{
+							Name:     "YoloGroup1",
+							Interval: "30s",
+							Rules: []*lokiv1beta1.RecordingRuleGroupSpec{
+								{
+									Record: "YoloRecordingRule1",
+									Expr:   "1 > 0",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			k.managedTenants = tc.tenants
+			testutil.Equals(t, tc.want, k.getTenantLogsRecordingRuleGroups(tc.input))
 		})
 	}
 }
