@@ -61,6 +61,11 @@ function(params) {
         resources: ['prometheusrules'],
         verbs: ['get', 'list', 'watch'],
       },
+      {
+        apiGroups: ['loki.grafana.com'],
+        resources: ['alertingrules', 'recordingrules'],
+        verbs: ['get', 'list', 'watch'],
+      },
     ],
   },
 
