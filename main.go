@@ -13,14 +13,17 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	lokiv1beta1 "github.com/grafana/loki/operator/apis/loki/v1beta1"
+	"github.com/observatorium/api/client/parameters"
 	"github.com/observatorium/obsctl/pkg/config"
 	"github.com/observatorium/obsctl/pkg/fetcher"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	monitoringclient "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned"
 	"github.com/prometheus/prometheus/pkg/rulefmt"
 	"gopkg.in/yaml.v3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	k8sconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 const (
@@ -31,24 +34,46 @@ const (
 // tenantRulesLoader represents logic for loading and filtering PrometheusRule objects by tenants.
 // Useful for testing without spinning up cluster.
 type tenantRulesLoader interface {
+	getLokiAlertingRules() ([]lokiv1beta1.AlertingRule, error)
+	getLokiRecordingRules() ([]lokiv1beta1.RecordingRule, error)
 	getPrometheusRules() ([]*monitoringv1.PrometheusRule, error)
-	getTenantRuleGroups(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec
+	getTenantLogsAlertingRuleGroups(alertingRules []lokiv1beta1.AlertingRule) map[string]lokiv1beta1.AlertingRuleSpec
+	getTenantLogsRecordingRuleGroups(recordingRules []lokiv1beta1.RecordingRule) map[string]lokiv1beta1.RecordingRuleSpec
+	getTenantMetricsRuleGroups(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec
 }
 
 // kubeRulesLoader implements tenantRulesLoader interface.
 type kubeRulesLoader struct {
 	ctx            context.Context
+	k8s            client.Client
 	logger         log.Logger
+	namespace      string
 	managedTenants string
 }
 
-func (k *kubeRulesLoader) getPrometheusRules() ([]*monitoringv1.PrometheusRule, error) {
-	client, err := monitoringclient.NewForConfig(ctrl.GetConfigOrDie())
+func (k *kubeRulesLoader) getLokiAlertingRules() ([]lokiv1beta1.AlertingRule, error) {
+	alertingRules := lokiv1beta1.AlertingRuleList{}
+	err := k.k8s.List(k.ctx, &alertingRules, client.InNamespace(k.namespace))
 	if err != nil {
 		return nil, err
 	}
-	prometheusRules, err := client.MonitoringV1().PrometheusRules(os.Getenv("NAMESPACE_NAME")).
-		List(k.ctx, metav1.ListOptions{})
+
+	return alertingRules.Items, nil
+}
+
+func (k *kubeRulesLoader) getLokiRecordingRules() ([]lokiv1beta1.RecordingRule, error) {
+	recordingRules := lokiv1beta1.RecordingRuleList{}
+	err := k.k8s.List(k.ctx, &recordingRules, client.InNamespace(k.namespace))
+	if err != nil {
+		return nil, err
+	}
+
+	return recordingRules.Items, nil
+}
+
+func (k *kubeRulesLoader) getPrometheusRules() ([]*monitoringv1.PrometheusRule, error) {
+	prometheusRules := monitoringv1.PrometheusRuleList{}
+	err := k.k8s.List(k.ctx, &prometheusRules, client.InNamespace(k.namespace))
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +81,63 @@ func (k *kubeRulesLoader) getPrometheusRules() ([]*monitoringv1.PrometheusRule, 
 	return prometheusRules.Items, nil
 }
 
-func (k *kubeRulesLoader) getTenantRuleGroups(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
+func (k *kubeRulesLoader) getTenantLogsAlertingRuleGroups(alertingRules []lokiv1beta1.AlertingRule) map[string]lokiv1beta1.AlertingRuleSpec {
+	tenantRules := make(map[string][]*lokiv1beta1.AlertingRuleGroup)
+	managedTenants := strings.Split(k.managedTenants, ",")
+	for _, tenant := range managedTenants {
+		if tenant != "" {
+			tenantRules[tenant] = []*lokiv1beta1.AlertingRuleGroup{}
+		}
+	}
+
+	for _, ar := range alertingRules {
+		level.Info(k.logger).Log("msg", "checking Loki alerting rule for tenant", "name", ar.Name)
+		if _, found := tenantRules[ar.Spec.TenantID]; !found {
+			level.Info(k.logger).Log("msg", "skipping Loki alerting rule with unmanaged tenant", "name", ar.Name, "tenant", ar.Spec.TenantID)
+			continue
+		}
+
+		level.Info(k.logger).Log("msg", "checking Loki alerting rule tenant rules", "name", ar.Name, "tenant", ar.Spec.TenantID)
+		tenantRules[ar.Spec.TenantID] = append(tenantRules[ar.Spec.TenantID], ar.Spec.Groups...)
+	}
+
+	tenantRuleGroups := make(map[string]lokiv1beta1.AlertingRuleSpec, len(tenantRules))
+	for tenant, tr := range tenantRules {
+		tenantRuleGroups[tenant] = lokiv1beta1.AlertingRuleSpec{Groups: tr}
+	}
+
+	return tenantRuleGroups
+}
+
+func (k *kubeRulesLoader) getTenantLogsRecordingRuleGroups(recordingRules []lokiv1beta1.RecordingRule) map[string]lokiv1beta1.RecordingRuleSpec {
+	tenantRules := make(map[string][]*lokiv1beta1.RecordingRuleGroup)
+	managedTenants := strings.Split(k.managedTenants, ",")
+	for _, tenant := range managedTenants {
+		if tenant != "" {
+			tenantRules[tenant] = []*lokiv1beta1.RecordingRuleGroup{}
+		}
+	}
+
+	for _, ar := range recordingRules {
+		level.Info(k.logger).Log("msg", "checking Loki Recording rule for tenant", "name", ar.Name)
+		if _, found := tenantRules[ar.Spec.TenantID]; !found {
+			level.Info(k.logger).Log("msg", "skipping Loki Recording rule with unmanaged tenant", "name", ar.Name, "tenant", ar.Spec.TenantID)
+			continue
+		}
+
+		level.Info(k.logger).Log("msg", "checking Loki Recording rule tenant rules", "name", ar.Name, "tenant", ar.Spec.TenantID)
+		tenantRules[ar.Spec.TenantID] = append(tenantRules[ar.Spec.TenantID], ar.Spec.Groups...)
+	}
+
+	tenantRuleGroups := make(map[string]lokiv1beta1.RecordingRuleSpec, len(tenantRules))
+	for tenant, tr := range tenantRules {
+		tenantRuleGroups[tenant] = lokiv1beta1.RecordingRuleSpec{Groups: tr}
+	}
+
+	return tenantRuleGroups
+}
+
+func (k *kubeRulesLoader) getTenantMetricsRuleGroups(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec {
 	tenantRules := make(map[string][]monitoringv1.RuleGroup)
 	managedTenants := strings.Split(k.managedTenants, ",")
 	for _, tenant := range managedTenants {
@@ -91,6 +172,8 @@ func (k *kubeRulesLoader) getTenantRuleGroups(prometheusRules []*monitoringv1.Pr
 type tenantRulesSyncer interface {
 	initOrReloadObsctlConfig() error
 	setCurrentTenant(tenant string) error
+	obsctlLogsAlertingSet(rules lokiv1beta1.AlertingRuleSpec) error
+	obsctlLogsRecordingSet(rules lokiv1beta1.RecordingRuleSpec) error
 	obsctlMetricsSet(rules monitoringv1.PrometheusRuleSpec) error
 }
 
@@ -167,6 +250,74 @@ func (o *obsctlRulesSyncer) setCurrentTenant(tenant string) error {
 	return nil
 }
 
+func (o *obsctlRulesSyncer) obsctlLogsAlertingSet(rules lokiv1beta1.AlertingRuleSpec) error {
+	level.Info(o.logger).Log("msg", "setting logs for tenant")
+	fc, currentTenant, err := fetcher.NewCustomFetcher(o.ctx, o.logger)
+	if err != nil {
+		level.Error(o.logger).Log("msg", "getting fetcher client", "error", err)
+		return err
+	}
+
+	for _, group := range rules.Groups {
+		body, err := yaml.Marshal(group)
+		if err != nil {
+			level.Error(o.logger).Log("msg", "converting lokiv1beta1 alerting rule group to yaml", "error", err)
+			return err
+		}
+
+		level.Info(o.logger).Log("msg", "setting rule file", "rule", string(body))
+		resp, err := fc.SetLogsRulesWithBodyWithResponse(o.ctx, currentTenant, parameters.LogRulesNamespace(currentTenant), "application/yaml", bytes.NewReader(body))
+		if err != nil {
+			level.Error(o.logger).Log("msg", "getting response", "error", err)
+			return err
+		}
+
+		if resp.StatusCode()/100 != 2 {
+			if len(resp.Body) != 0 {
+				level.Error(o.logger).Log("msg", "setting loki alerting rules", "error", string(resp.Body))
+				return err
+			}
+		}
+		level.Info(o.logger).Log("msg", string(resp.Body))
+	}
+
+	return nil
+}
+
+func (o *obsctlRulesSyncer) obsctlLogsRecordingSet(rules lokiv1beta1.RecordingRuleSpec) error {
+	level.Info(o.logger).Log("msg", "setting logs for tenant")
+	fc, currentTenant, err := fetcher.NewCustomFetcher(o.ctx, o.logger)
+	if err != nil {
+		level.Error(o.logger).Log("msg", "getting fetcher client", "error", err)
+		return err
+	}
+
+	for _, group := range rules.Groups {
+		body, err := yaml.Marshal(group)
+		if err != nil {
+			level.Error(o.logger).Log("msg", "converting lokiv1beta1 recording rule group to yaml", "error", err)
+			return err
+		}
+
+		level.Info(o.logger).Log("msg", "setting rule file", "rule", string(body))
+		resp, err := fc.SetLogsRulesWithBodyWithResponse(o.ctx, currentTenant, parameters.LogRulesNamespace(currentTenant), "application/yaml", bytes.NewReader(body))
+		if err != nil {
+			level.Error(o.logger).Log("msg", "getting response", "error", err)
+			return err
+		}
+
+		if resp.StatusCode()/100 != 2 {
+			if len(resp.Body) != 0 {
+				level.Error(o.logger).Log("msg", "setting loki recording rules", "error", string(resp.Body))
+				return err
+			}
+		}
+		level.Info(o.logger).Log("msg", string(resp.Body))
+	}
+
+	return nil
+}
+
 func (o *obsctlRulesSyncer) obsctlMetricsSet(rules monitoringv1.PrometheusRuleSpec) error {
 	level.Info(o.logger).Log("msg", "setting metrics for tenant")
 	fc, currentTenant, err := fetcher.NewCustomFetcher(o.ctx, o.logger)
@@ -213,7 +364,7 @@ func (o *obsctlRulesSyncer) obsctlMetricsSet(rules monitoringv1.PrometheusRuleSp
 	return nil
 }
 
-// syncLoop syncs PrometheusRule objects of each managed tenant with Observatorium API every SLEEP_DURATION_SECONDS.
+// syncLoop syncs PrometheusRule and Loki's AlertingRule/RecordingRule objects of each managed tenant with Observatorium API every SLEEP_DURATION_SECONDS.
 func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o tenantRulesSyncer, sleepDurationSeconds uint) {
 	for {
 		select {
@@ -225,7 +376,7 @@ func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o ten
 			}
 
 			// Set each tenant as current and set rules.
-			for tenant, ruleGroups := range k.getTenantRuleGroups(prometheusRules) {
+			for tenant, ruleGroups := range k.getTenantMetricsRuleGroups(prometheusRules) {
 				if err := o.setCurrentTenant(tenant); err != nil {
 					level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
 					os.Exit(1)
@@ -234,6 +385,44 @@ func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o ten
 				err = o.obsctlMetricsSet(ruleGroups)
 				if err != nil {
 					level.Error(logger).Log("msg", "error setting rules", "tenant", tenant, "error", err)
+					os.Exit(1)
+				}
+			}
+
+			lokiAlertingRules, err := k.getLokiAlertingRules()
+			if err != nil {
+				level.Error(logger).Log("msg", "error getting loki alerting rules", "error", err, "rules", len(lokiAlertingRules))
+				os.Exit(1)
+			}
+
+			for tenant, ruleGroups := range k.getTenantLogsAlertingRuleGroups(lokiAlertingRules) {
+				if err := o.setCurrentTenant(tenant); err != nil {
+					level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
+					os.Exit(1)
+				}
+
+				err = o.obsctlLogsAlertingSet(ruleGroups)
+				if err != nil {
+					level.Error(logger).Log("msg", "error setting loki alerting rules", "tenant", tenant, "error", err)
+					os.Exit(1)
+				}
+			}
+
+			lokiRecordingRules, err := k.getLokiRecordingRules()
+			if err != nil {
+				level.Error(logger).Log("msg", "error getting loki recording rules", "error", err, "rules", len(lokiRecordingRules))
+				os.Exit(1)
+			}
+
+			for tenant, ruleGroups := range k.getTenantLogsRecordingRuleGroups(lokiRecordingRules) {
+				if err := o.setCurrentTenant(tenant); err != nil {
+					level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
+					os.Exit(1)
+				}
+
+				err = o.obsctlLogsRecordingSet(ruleGroups)
+				if err != nil {
+					level.Error(logger).Log("msg", "error setting loki recording rules", "tenant", tenant, "error", err)
 					os.Exit(1)
 				}
 			}
@@ -280,6 +469,11 @@ func main() {
 		cancel()
 	}()
 
+	namespace := os.Getenv("NAMESPACE_NAME")
+	if namespace == "" {
+		panic("Missing env var NAMESPACE_NAME")
+	}
+
 	logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 
 	o := &obsctlRulesSyncer{
@@ -297,10 +491,40 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Create kubernetes client for deployments
+	k8sCfg, err := k8sconfig.GetConfig()
+	if err != nil {
+		panic("Failed to read kubeconfig")
+	}
+
+	mapper, err := apiutil.NewDynamicRESTMapper(k8sCfg)
+	if err != nil {
+		panic("Failed to create new dynamic REST mapper")
+	}
+
+	err = monitoringv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		panic("Failed to register monitoringv1 types to runtime scheme")
+	}
+
+	err = lokiv1beta1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		panic("Failed to register lokiv1beta1 types to runtime scheme")
+	}
+
+	opts := client.Options{Scheme: scheme.Scheme, Mapper: mapper}
+
+	k8sClient, err := client.New(k8sCfg, opts)
+	if err != nil {
+		panic("Failed to create new k8s client")
+	}
+
 	syncLoop(ctx, logger,
 		&kubeRulesLoader{
 			ctx:            ctx,
+			k8s:            k8sClient,
 			logger:         log.With(logger, "component", "kube-rules-loader"),
+			namespace:      namespace,
 			managedTenants: cfg.managedTenants,
 		}, o,
 		cfg.sleepDurationSeconds,
