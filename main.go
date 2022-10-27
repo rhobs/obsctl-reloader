@@ -20,6 +20,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/prometheus/prometheus/pkg/rulefmt"
 	"gopkg.in/yaml.v3"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -180,6 +181,8 @@ type tenantRulesSyncer interface {
 // obsctlRulesSyncer implements tenantRulesSyncer.
 type obsctlRulesSyncer struct {
 	ctx             context.Context
+	k8s             client.Client
+	namespace       string
 	logger          log.Logger
 	skipClientCheck bool
 
@@ -215,13 +218,40 @@ func (o *obsctlRulesSyncer) initOrReloadObsctlConfig() error {
 		return err
 	}
 
+	tenantSecret := map[string]corev1.Secret{}
+
+	// List secrets.
+	secret := corev1.SecretList{}
+	err = o.k8s.List(o.ctx, &secret, client.InNamespace(o.namespace))
+	if err != nil {
+		return err
+	}
+
+	// Filter secrets for configured tenants.
+	configuredTenants := strings.Split(o.managedTenants, ",")
+	for i := range secret.Items {
+		lbls := secret.Items[i].Labels
+
+		for _, tenant := range configuredTenants {
+			if t, ok := lbls["tenant"]; ok {
+				if tenant == t {
+					tenantSecret[tenant] = secret.Items[i]
+					break
+				}
+			}
+		}
+	}
+
 	// Add all managed tenants under the API.
-	for _, tenant := range strings.Split(o.managedTenants, ",") {
+	for tenant, secret := range tenantSecret {
 		tenantCfg := config.TenantConfig{OIDC: new(config.OIDCConfig)}
 		tenantCfg.Tenant = tenant
 		tenantCfg.OIDC.Audience = o.audience
-		tenantCfg.OIDC.ClientID = os.Getenv(strings.ToUpper(tenant) + "_CLIENT_ID")
-		tenantCfg.OIDC.ClientSecret = os.Getenv(strings.ToUpper(tenant) + "_CLIENT_SECRET")
+		// Get tenant credentials from secret.
+		if secret.Data != nil {
+			tenantCfg.OIDC.ClientID = string(secret.Data["client_id"])
+			tenantCfg.OIDC.ClientSecret = string(secret.Data["client_secret"])
+		}
 		tenantCfg.OIDC.IssuerURL = o.issuerURL
 
 		if !o.skipClientCheck {
@@ -476,21 +506,6 @@ func main() {
 
 	logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 
-	o := &obsctlRulesSyncer{
-		ctx:            ctx,
-		logger:         log.With(logger, "component", "obsctl-syncer"),
-		apiURL:         cfg.observatoriumURL,
-		audience:       cfg.audience,
-		issuerURL:      cfg.issuerURL,
-		managedTenants: cfg.managedTenants,
-	}
-
-	// Initialize config.
-	if err := o.initOrReloadObsctlConfig(); err != nil {
-		level.Error(logger).Log("msg", "error reloading/initializing obsctl config", "error", err)
-		os.Exit(1)
-	}
-
 	// Create kubernetes client for deployments
 	k8sCfg, err := k8sconfig.GetConfig()
 	if err != nil {
@@ -517,6 +532,23 @@ func main() {
 	k8sClient, err := client.New(k8sCfg, opts)
 	if err != nil {
 		panic("Failed to create new k8s client")
+	}
+
+	o := &obsctlRulesSyncer{
+		ctx:            ctx,
+		k8s:            k8sClient,
+		namespace:      namespace,
+		logger:         log.With(logger, "component", "obsctl-syncer"),
+		apiURL:         cfg.observatoriumURL,
+		audience:       cfg.audience,
+		issuerURL:      cfg.issuerURL,
+		managedTenants: cfg.managedTenants,
+	}
+
+	// Initialize config.
+	if err := o.initOrReloadObsctlConfig(); err != nil {
+		level.Error(logger).Log("msg", "error reloading/initializing obsctl config", "error", err)
+		os.Exit(1)
 	}
 
 	syncLoop(ctx, logger,
