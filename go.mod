@@ -18,6 +18,7 @@ require (
 require (
 	github.com/grafana/loki/operator v0.0.0-20221006151732-289190ee2669
 	github.com/observatorium/api v0.1.3-0.20221005180515-c3230526775b
+	k8s.io/api v0.24.4
 	k8s.io/client-go v0.24.4
 )
 
@@ -84,7 +85,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	k8s.io/api v0.24.4 // indirect
 	k8s.io/apiextensions-apiserver v0.24.2 // indirect
 	k8s.io/component-base v0.24.4 // indirect
 	k8s.io/klog/v2 v2.60.1 // indirect
