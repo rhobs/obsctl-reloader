@@ -129,7 +129,7 @@ function(params) {
                 '--managed-tenants=%s' % or.config.env.managedTenants,
                 '--issuer-url=%s' % or.config.env.oidcIssuerURL,
                 '--audience=%s' % or.config.env.oidcAudience,
-              ] + if std.objectHas(or.config.env, 'logRulesEnabled') then ['--log-rules-enabled=%s' % or.config.env.logRulesEnabled ] else [],
+              ] + if std.objectHas(or.config.env, 'logRulesEnabled') then ['--log-rules-enabled=%s' % or.config.env.logRulesEnabled] else [],
               resources: if or.config.resources != {} then or.config.resources else {},
               env: [
                 {
