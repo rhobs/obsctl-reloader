@@ -9,7 +9,14 @@ local defaults = {
   image: error 'must provide image',
   imagePullPolicy: 'IfNotPresent',
   replicas: error 'must provide replicas',
-  env: error 'must provide env',
+  env: {
+    observatoriumURL: '${OBSERVATORIUM_URL}',
+    oidcAudience: '${OIDC_AUDIENCE}',
+    oidcIssuerURL: '${OIDC_ISSUER_URL}',
+    sleepDurationSeconds: '${SLEEP_DURATION_SECONDS}',
+    managedTenants: '${MANAGED_TENANTS}',
+    logRulesEnabled: 'true',
+  },
   tenantSecretMap: error 'must provide tenantSecretMap',
   resources: {},
 
@@ -122,7 +129,7 @@ function(params) {
                 '--managed-tenants=%s' % or.config.env.managedTenants,
                 '--issuer-url=%s' % or.config.env.oidcIssuerURL,
                 '--audience=%s' % or.config.env.oidcAudience,
-              ],
+              ] + if std.objectHas(or.config.env, 'logRulesEnabled') then ['--log-rules-enabled=%s' % or.config.env.logRulesEnabled ] else [],
               resources: if or.config.resources != {} then or.config.resources else {},
               env: [
                 {

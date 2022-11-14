@@ -365,7 +365,7 @@ func (o *obsctlRulesSyncer) obsctlMetricsSet(rules monitoringv1.PrometheusRuleSp
 }
 
 // syncLoop syncs PrometheusRule and Loki's AlertingRule/RecordingRule objects of each managed tenant with Observatorium API every SLEEP_DURATION_SECONDS.
-func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o tenantRulesSyncer, sleepDurationSeconds uint) {
+func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o tenantRulesSyncer, logRulesEnabled bool, sleepDurationSeconds uint) {
 	for {
 		select {
 		case <-time.After(time.Duration(sleepDurationSeconds) * time.Second):
@@ -389,41 +389,43 @@ func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o ten
 				}
 			}
 
-			lokiAlertingRules, err := k.getLokiAlertingRules()
-			if err != nil {
-				level.Error(logger).Log("msg", "error getting loki alerting rules", "error", err, "rules", len(lokiAlertingRules))
-				os.Exit(1)
-			}
-
-			for tenant, ruleGroups := range k.getTenantLogsAlertingRuleGroups(lokiAlertingRules) {
-				if err := o.setCurrentTenant(tenant); err != nil {
-					level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
-					os.Exit(1)
-				}
-
-				err = o.obsctlLogsAlertingSet(ruleGroups)
+			if logRulesEnabled {
+				lokiAlertingRules, err := k.getLokiAlertingRules()
 				if err != nil {
-					level.Error(logger).Log("msg", "error setting loki alerting rules", "tenant", tenant, "error", err)
-					os.Exit(1)
-				}
-			}
-
-			lokiRecordingRules, err := k.getLokiRecordingRules()
-			if err != nil {
-				level.Error(logger).Log("msg", "error getting loki recording rules", "error", err, "rules", len(lokiRecordingRules))
-				os.Exit(1)
-			}
-
-			for tenant, ruleGroups := range k.getTenantLogsRecordingRuleGroups(lokiRecordingRules) {
-				if err := o.setCurrentTenant(tenant); err != nil {
-					level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
+					level.Error(logger).Log("msg", "error getting loki alerting rules", "error", err, "rules", len(lokiAlertingRules))
 					os.Exit(1)
 				}
 
-				err = o.obsctlLogsRecordingSet(ruleGroups)
+				for tenant, ruleGroups := range k.getTenantLogsAlertingRuleGroups(lokiAlertingRules) {
+					if err := o.setCurrentTenant(tenant); err != nil {
+						level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
+						os.Exit(1)
+					}
+
+					err = o.obsctlLogsAlertingSet(ruleGroups)
+					if err != nil {
+						level.Error(logger).Log("msg", "error setting loki alerting rules", "tenant", tenant, "error", err)
+						os.Exit(1)
+					}
+				}
+
+				lokiRecordingRules, err := k.getLokiRecordingRules()
 				if err != nil {
-					level.Error(logger).Log("msg", "error setting loki recording rules", "tenant", tenant, "error", err)
+					level.Error(logger).Log("msg", "error getting loki recording rules", "error", err, "rules", len(lokiRecordingRules))
 					os.Exit(1)
+				}
+
+				for tenant, ruleGroups := range k.getTenantLogsRecordingRuleGroups(lokiRecordingRules) {
+					if err := o.setCurrentTenant(tenant); err != nil {
+						level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
+						os.Exit(1)
+					}
+
+					err = o.obsctlLogsRecordingSet(ruleGroups)
+					if err != nil {
+						level.Error(logger).Log("msg", "error setting loki recording rules", "tenant", tenant, "error", err)
+						os.Exit(1)
+					}
 				}
 			}
 
@@ -440,6 +442,7 @@ type cfg struct {
 	managedTenants       string
 	audience             string
 	issuerURL            string
+	logRulesEnabled      bool
 }
 
 func parseFlags() *cfg {
@@ -451,6 +454,7 @@ func parseFlags() *cfg {
 	flag.StringVar(&cfg.managedTenants, "managed-tenants", "", "The name of the tenants whose rules should be synced. If there are multiple tenants, ensure they are comma-separated.")
 	flag.StringVar(&cfg.issuerURL, "issuer-url", "", "The OIDC issuer URL, see https://openid.net/specs/openid-connect-discovery-1_0.html#IssuerDiscovery.")
 	flag.StringVar(&cfg.audience, "audience", "", "The audience for whom the access token is intended, see https://openid.net/specs/openid-connect-core-1_0.html#IDToken.")
+	flag.BoolVar(&cfg.logRulesEnabled, "log-rules-enabled", true, "Enable syncing Loki logging rules. Always on by default.")
 
 	flag.Parse()
 	return cfg
@@ -507,9 +511,11 @@ func main() {
 		panic("Failed to register monitoringv1 types to runtime scheme")
 	}
 
-	err = lokiv1beta1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		panic("Failed to register lokiv1beta1 types to runtime scheme")
+	if cfg.logRulesEnabled {
+		err = lokiv1beta1.AddToScheme(scheme.Scheme)
+		if err != nil {
+			panic("Failed to register lokiv1beta1 types to runtime scheme")
+		}
 	}
 
 	opts := client.Options{Scheme: scheme.Scheme, Mapper: mapper}
@@ -527,6 +533,7 @@ func main() {
 			namespace:      namespace,
 			managedTenants: cfg.managedTenants,
 		}, o,
+		cfg.logRulesEnabled,
 		cfg.sleepDurationSeconds,
 	)
 }
