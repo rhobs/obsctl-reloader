@@ -39,6 +39,7 @@ objects:
           - --managed-tenants=${MANAGED_TENANTS}
           - --issuer-url=${OIDC_ISSUER_URL}
           - --audience=${OIDC_AUDIENCE}
+          - --log-rules-enabled=true
           env:
           - name: NAMESPACE_NAME
             valueFrom:

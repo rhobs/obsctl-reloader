@@ -10,6 +10,7 @@ local or = (import '../jsonnet/lib/obsctl-reloader.libsonnet')({
     oidcIssuerURL: '${OIDC_ISSUER_URL}',
     sleepDurationSeconds: '${SLEEP_DURATION_SECONDS}',
     managedTenants: '${MANAGED_TENANTS}',
+    logRulesEnabled: true,
   },
   tenantSecretMap: [
     {

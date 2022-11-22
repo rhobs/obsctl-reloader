@@ -85,7 +85,7 @@ func TestSyncLoop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(25*time.Second, func() { cancel() })
 
-	syncLoop(ctx, log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), rl, rs, 5)
+	syncLoop(ctx, log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), rl, rs, true, 5)
 
 	testutil.Equals(t, 12, rs.setCurrentTenantCnt)
 	testutil.Equals(t, 4, rs.metricsRulesCnt)
