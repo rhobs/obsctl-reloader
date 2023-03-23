@@ -113,9 +113,8 @@ check-docs: gobuild $(MDOX) ## Checks docs for discrepancies in formatting and l
 # to debug big allocations during linting.
 lint: ## Runs various static analysis against our code.
 lint: $(FAILLINT) $(GOLANGCI_LINT) $(MISSPELL) format check-git deps
-	$(call require_clean_work_tree,"detected not clean master before running lint")
 	@echo ">> verifying modules being imported"
-	@$(FAILLINT) -paths "fmt.{Print,Printf,Println}" -ignore-tests ./...
+	$(FAILLINT) -paths "fmt.{Print,Printf,Println}" -ignore-tests ./...
 	@echo ">> examining all of the Go files"
 	@go vet -stdmethods=false ./...
 	@echo ">> linting all of the Go files GOGC=${GOGC}"
