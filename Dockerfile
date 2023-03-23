@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/go-toolset:1.17.7-13 as builder
+FROM registry.access.redhat.com/ubi8/go-toolset:1.18.9-13 as builder
 WORKDIR /app
 COPY . .
 RUN go build -o /tmp/obsctl-reloader
