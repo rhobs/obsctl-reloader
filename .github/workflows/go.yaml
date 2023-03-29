@@ -17,7 +17,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17.x
+          go-version: 1.19.x
 
       - uses: actions/cache@v1
         with:
@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [ '1.17.x']
+        go: [ '1.19.x']
         platform: [ubuntu-latest]
 
     name: Tests on Go ${{ matrix.go }} ${{ matrix.platform }}

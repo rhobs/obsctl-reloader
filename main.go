@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	lokiv1 "github.com/grafana/loki/operator/apis/loki/v1"
 	lokiv1beta1 "github.com/grafana/loki/operator/apis/loki/v1beta1"
 	"github.com/observatorium/api/client/parameters"
 	"github.com/observatorium/obsctl/pkg/config"
@@ -34,11 +35,11 @@ const (
 // tenantRulesLoader represents logic for loading and filtering PrometheusRule objects by tenants.
 // Useful for testing without spinning up cluster.
 type tenantRulesLoader interface {
-	getLokiAlertingRules() ([]lokiv1beta1.AlertingRule, error)
-	getLokiRecordingRules() ([]lokiv1beta1.RecordingRule, error)
+	getLokiAlertingRules() ([]lokiv1.AlertingRule, error)
+	getLokiRecordingRules() ([]lokiv1.RecordingRule, error)
 	getPrometheusRules() ([]*monitoringv1.PrometheusRule, error)
-	getTenantLogsAlertingRuleGroups(alertingRules []lokiv1beta1.AlertingRule) map[string]lokiv1beta1.AlertingRuleSpec
-	getTenantLogsRecordingRuleGroups(recordingRules []lokiv1beta1.RecordingRule) map[string]lokiv1beta1.RecordingRuleSpec
+	getTenantLogsAlertingRuleGroups(alertingRules []lokiv1.AlertingRule) map[string]lokiv1.AlertingRuleSpec
+	getTenantLogsRecordingRuleGroups(recordingRules []lokiv1.RecordingRule) map[string]lokiv1.RecordingRuleSpec
 	getTenantMetricsRuleGroups(prometheusRules []*monitoringv1.PrometheusRule) map[string]monitoringv1.PrometheusRuleSpec
 }
 
@@ -51,24 +52,50 @@ type kubeRulesLoader struct {
 	managedTenants string
 }
 
-func (k *kubeRulesLoader) getLokiAlertingRules() ([]lokiv1beta1.AlertingRule, error) {
-	alertingRules := lokiv1beta1.AlertingRuleList{}
-	err := k.k8s.List(k.ctx, &alertingRules, client.InNamespace(k.namespace))
-	if err != nil {
+func (k *kubeRulesLoader) getLokiAlertingRules() ([]lokiv1.AlertingRule, error) {
+	arV1Beta1 := lokiv1beta1.AlertingRuleList{}
+	if err := k.k8s.List(k.ctx, &arV1Beta1, client.InNamespace(k.namespace)); err != nil {
 		return nil, err
 	}
 
-	return alertingRules.Items, nil
+	arV1 := lokiv1.AlertingRuleList{}
+	if err := k.k8s.List(k.ctx, &arV1, client.InNamespace(k.namespace)); err != nil {
+		return nil, err
+	}
+
+	for _, ar := range arV1Beta1.Items {
+		v1 := lokiv1.AlertingRule{}
+		if err := ar.ConvertTo(&v1); err != nil {
+			return nil, err
+		}
+
+		arV1.Items = append(arV1.Items, v1)
+	}
+
+	return arV1.Items, nil
 }
 
-func (k *kubeRulesLoader) getLokiRecordingRules() ([]lokiv1beta1.RecordingRule, error) {
-	recordingRules := lokiv1beta1.RecordingRuleList{}
-	err := k.k8s.List(k.ctx, &recordingRules, client.InNamespace(k.namespace))
-	if err != nil {
+func (k *kubeRulesLoader) getLokiRecordingRules() ([]lokiv1.RecordingRule, error) {
+	rrV1Beta1 := lokiv1beta1.RecordingRuleList{}
+	if err := k.k8s.List(k.ctx, &rrV1Beta1, client.InNamespace(k.namespace)); err != nil {
 		return nil, err
 	}
 
-	return recordingRules.Items, nil
+	rrV1 := lokiv1.RecordingRuleList{}
+	if err := k.k8s.List(k.ctx, &rrV1, client.InNamespace(k.namespace)); err != nil {
+		return nil, err
+	}
+
+	for _, ar := range rrV1Beta1.Items {
+		v1 := lokiv1.RecordingRule{}
+		if err := ar.ConvertTo(&v1); err != nil {
+			return nil, err
+		}
+
+		rrV1.Items = append(rrV1.Items, v1)
+	}
+
+	return rrV1.Items, nil
 }
 
 func (k *kubeRulesLoader) getPrometheusRules() ([]*monitoringv1.PrometheusRule, error) {
@@ -81,12 +108,12 @@ func (k *kubeRulesLoader) getPrometheusRules() ([]*monitoringv1.PrometheusRule, 
 	return prometheusRules.Items, nil
 }
 
-func (k *kubeRulesLoader) getTenantLogsAlertingRuleGroups(alertingRules []lokiv1beta1.AlertingRule) map[string]lokiv1beta1.AlertingRuleSpec {
-	tenantRules := make(map[string][]*lokiv1beta1.AlertingRuleGroup)
+func (k *kubeRulesLoader) getTenantLogsAlertingRuleGroups(alertingRules []lokiv1.AlertingRule) map[string]lokiv1.AlertingRuleSpec {
+	tenantRules := make(map[string][]*lokiv1.AlertingRuleGroup)
 	managedTenants := strings.Split(k.managedTenants, ",")
 	for _, tenant := range managedTenants {
 		if tenant != "" {
-			tenantRules[tenant] = []*lokiv1beta1.AlertingRuleGroup{}
+			tenantRules[tenant] = []*lokiv1.AlertingRuleGroup{}
 		}
 	}
 
@@ -101,20 +128,20 @@ func (k *kubeRulesLoader) getTenantLogsAlertingRuleGroups(alertingRules []lokiv1
 		tenantRules[ar.Spec.TenantID] = append(tenantRules[ar.Spec.TenantID], ar.Spec.Groups...)
 	}
 
-	tenantRuleGroups := make(map[string]lokiv1beta1.AlertingRuleSpec, len(tenantRules))
+	tenantRuleGroups := make(map[string]lokiv1.AlertingRuleSpec, len(tenantRules))
 	for tenant, tr := range tenantRules {
-		tenantRuleGroups[tenant] = lokiv1beta1.AlertingRuleSpec{Groups: tr}
+		tenantRuleGroups[tenant] = lokiv1.AlertingRuleSpec{Groups: tr}
 	}
 
 	return tenantRuleGroups
 }
 
-func (k *kubeRulesLoader) getTenantLogsRecordingRuleGroups(recordingRules []lokiv1beta1.RecordingRule) map[string]lokiv1beta1.RecordingRuleSpec {
-	tenantRules := make(map[string][]*lokiv1beta1.RecordingRuleGroup)
+func (k *kubeRulesLoader) getTenantLogsRecordingRuleGroups(recordingRules []lokiv1.RecordingRule) map[string]lokiv1.RecordingRuleSpec {
+	tenantRules := make(map[string][]*lokiv1.RecordingRuleGroup)
 	managedTenants := strings.Split(k.managedTenants, ",")
 	for _, tenant := range managedTenants {
 		if tenant != "" {
-			tenantRules[tenant] = []*lokiv1beta1.RecordingRuleGroup{}
+			tenantRules[tenant] = []*lokiv1.RecordingRuleGroup{}
 		}
 	}
 
@@ -129,9 +156,9 @@ func (k *kubeRulesLoader) getTenantLogsRecordingRuleGroups(recordingRules []loki
 		tenantRules[ar.Spec.TenantID] = append(tenantRules[ar.Spec.TenantID], ar.Spec.Groups...)
 	}
 
-	tenantRuleGroups := make(map[string]lokiv1beta1.RecordingRuleSpec, len(tenantRules))
+	tenantRuleGroups := make(map[string]lokiv1.RecordingRuleSpec, len(tenantRules))
 	for tenant, tr := range tenantRules {
-		tenantRuleGroups[tenant] = lokiv1beta1.RecordingRuleSpec{Groups: tr}
+		tenantRuleGroups[tenant] = lokiv1.RecordingRuleSpec{Groups: tr}
 	}
 
 	return tenantRuleGroups
@@ -172,8 +199,8 @@ func (k *kubeRulesLoader) getTenantMetricsRuleGroups(prometheusRules []*monitori
 type tenantRulesSyncer interface {
 	initOrReloadObsctlConfig() error
 	setCurrentTenant(tenant string) error
-	obsctlLogsAlertingSet(rules lokiv1beta1.AlertingRuleSpec) error
-	obsctlLogsRecordingSet(rules lokiv1beta1.RecordingRuleSpec) error
+	obsctlLogsAlertingSet(rules lokiv1.AlertingRuleSpec) error
+	obsctlLogsRecordingSet(rules lokiv1.RecordingRuleSpec) error
 	obsctlMetricsSet(rules monitoringv1.PrometheusRuleSpec) error
 }
 
@@ -250,7 +277,7 @@ func (o *obsctlRulesSyncer) setCurrentTenant(tenant string) error {
 	return nil
 }
 
-func (o *obsctlRulesSyncer) obsctlLogsAlertingSet(rules lokiv1beta1.AlertingRuleSpec) error {
+func (o *obsctlRulesSyncer) obsctlLogsAlertingSet(rules lokiv1.AlertingRuleSpec) error {
 	level.Info(o.logger).Log("msg", "setting logs for tenant")
 	fc, currentTenant, err := fetcher.NewCustomFetcher(o.ctx, o.logger)
 	if err != nil {
@@ -261,7 +288,7 @@ func (o *obsctlRulesSyncer) obsctlLogsAlertingSet(rules lokiv1beta1.AlertingRule
 	for _, group := range rules.Groups {
 		body, err := yaml.Marshal(group)
 		if err != nil {
-			level.Error(o.logger).Log("msg", "converting lokiv1beta1 alerting rule group to yaml", "error", err)
+			level.Error(o.logger).Log("msg", "converting lokiv1 alerting rule group to yaml", "error", err)
 			return err
 		}
 
@@ -284,7 +311,7 @@ func (o *obsctlRulesSyncer) obsctlLogsAlertingSet(rules lokiv1beta1.AlertingRule
 	return nil
 }
 
-func (o *obsctlRulesSyncer) obsctlLogsRecordingSet(rules lokiv1beta1.RecordingRuleSpec) error {
+func (o *obsctlRulesSyncer) obsctlLogsRecordingSet(rules lokiv1.RecordingRuleSpec) error {
 	level.Info(o.logger).Log("msg", "setting logs for tenant")
 	fc, currentTenant, err := fetcher.NewCustomFetcher(o.ctx, o.logger)
 	if err != nil {
@@ -295,7 +322,7 @@ func (o *obsctlRulesSyncer) obsctlLogsRecordingSet(rules lokiv1beta1.RecordingRu
 	for _, group := range rules.Groups {
 		body, err := yaml.Marshal(group)
 		if err != nil {
-			level.Error(o.logger).Log("msg", "converting lokiv1beta1 recording rule group to yaml", "error", err)
+			level.Error(o.logger).Log("msg", "converting lokiv1 recording rule group to yaml", "error", err)
 			return err
 		}
 
@@ -515,6 +542,11 @@ func main() {
 		err = lokiv1beta1.AddToScheme(scheme.Scheme)
 		if err != nil {
 			panic("Failed to register lokiv1beta1 types to runtime scheme")
+		}
+
+		err = lokiv1.AddToScheme(scheme.Scheme)
+		if err != nil {
+			panic("Failed to register lokiv1 types to runtime scheme")
 		}
 	}
 
