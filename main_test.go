@@ -12,6 +12,8 @@ import (
 	lokiv1 "github.com/grafana/loki/operator/apis/loki/v1"
 	"github.com/observatorium/obsctl/pkg/config"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -85,7 +87,7 @@ func TestSyncLoop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(25*time.Second, func() { cancel() })
 
-	syncLoop(ctx, log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), rl, rs, true, 5)
+	testutil.Ok(t, syncLoop(ctx, log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), rl, rs, true, 5))
 
 	testutil.Equals(t, 12, rs.setCurrentTenantCnt)
 	testutil.Equals(t, 4, rs.metricsRulesCnt)
@@ -266,7 +268,14 @@ func TestInitOrReloadObsctlConfig(t *testing.T) {
 }
 
 func TestGetTenantMetricsRuleGroups(t *testing.T) {
-	k := &kubeRulesLoader{ctx: context.TODO(), logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))}
+	k := &kubeRulesLoader{
+		ctx:    context.TODO(),
+		logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		promTenantRules: promauto.With(prometheus.NewRegistry()).NewGaugeVec(prometheus.GaugeOpts{
+			Name: "obsctl_reloader_prom_tenant_rulegroups",
+			Help: "Number of Prometheus rules loaded per tenant.",
+		}, []string{"tenant"}),
+	}
 
 	for _, tc := range []struct {
 		name    string
@@ -499,7 +508,14 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 }
 
 func TestGetTenantLokiAlertingRuleGroups(t *testing.T) {
-	k := &kubeRulesLoader{ctx: context.TODO(), logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))}
+	k := &kubeRulesLoader{
+		ctx:    context.TODO(),
+		logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		lokiTenantRules: promauto.With(prometheus.NewRegistry()).NewGaugeVec(prometheus.GaugeOpts{
+			Name: "obsctl_reloader_loki_tenant_rulegroups",
+			Help: "Number of Loki rules loaded per tenant.",
+		}, []string{"type", "tenant"}),
+	}
 
 	for _, tc := range []struct {
 		name    string
@@ -736,7 +752,14 @@ func TestGetTenantLokiAlertingRuleGroups(t *testing.T) {
 }
 
 func TestGetTenantLokiRecordingRuleGroups(t *testing.T) {
-	k := &kubeRulesLoader{ctx: context.TODO(), logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))}
+	k := &kubeRulesLoader{
+		ctx:    context.TODO(),
+		logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		lokiTenantRules: promauto.With(prometheus.NewRegistry()).NewGaugeVec(prometheus.GaugeOpts{
+			Name: "obsctl_reloader_loki_tenant_rulegroups",
+			Help: "Number of Loki rules loaded per tenant.",
+		}, []string{"type", "tenant"}),
+	}
 
 	for _, tc := range []struct {
 		name    string

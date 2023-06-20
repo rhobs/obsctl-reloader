@@ -16,8 +16,12 @@ require (
 )
 
 require (
+	github.com/efficientgo/core v1.0.0-rc.2
 	github.com/grafana/loki/operator/apis/loki v0.0.0-20230323133219-93a1c21da5c9
+	github.com/metalmatze/signal v0.0.0-20210307161603-1c9aa721a97a
 	github.com/observatorium/api v0.1.3-0.20221005180515-c3230526775b
+	github.com/oklog/run v1.1.0
+	github.com/prometheus/client_golang v1.14.0
 	k8s.io/client-go v0.26.1
 )
 
@@ -55,7 +59,6 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
