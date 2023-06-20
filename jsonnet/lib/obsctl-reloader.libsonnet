@@ -9,6 +9,11 @@ local defaults = {
   image: error 'must provide image',
   imagePullPolicy: 'IfNotPresent',
   replicas: error 'must provide replicas',
+  logLevel: 'info',
+  ports: {
+    internal: 8081,
+  },
+  serviceMonitor: true,
   env: {
     observatoriumURL: '${OBSERVATORIUM_URL}',
     oidcAudience: '${OIDC_AUDIENCE}',
@@ -97,6 +102,27 @@ function(params) {
     ],
   },
 
+  service: {
+    apiVersion: 'v1',
+    kind: 'Service',
+    metadata: {
+      name: or.config.name,
+      namespace: or.config.namespace,
+      labels: or.config.commonLabels,
+    },
+    spec: {
+      selector: or.config.podLabelSelector,
+      ports: [
+        {
+          name: name,
+          port: or.config.ports[name],
+          targetPort: or.config.ports[name],
+        }
+        for name in std.objectFields(or.config.ports)
+      ],
+    },
+  },
+
   deployment: {
     apiVersion: 'apps/v1',
     kind: 'Deployment',
@@ -124,6 +150,8 @@ function(params) {
               image: or.config.image,
               imagePullPolicy: or.config.imagePullPolicy,
               args: [
+                '--log.level=%s' % or.config.logLevel,
+                '--web.internal.listen=0.0.0.0:%d' % or.config.ports.internal,
                 '--sleep-duration-seconds=%s' % or.config.env.sleepDurationSeconds,
                 '--observatorium-api-url=%s' % or.config.env.observatoriumURL,
                 '--managed-tenants=%s' % or.config.env.managedTenants,
@@ -169,6 +197,21 @@ function(params) {
           ],
         },
       },
+    },
+  },
+
+  serviceMonitor: if or.config.serviceMonitor == true then {
+    apiVersion: 'monitoring.coreos.com/v1',
+    kind: 'ServiceMonitor',
+    metadata+: {
+      name: or.config.name,
+      namespace: or.config.namespace,
+    },
+    spec: {
+      selector: {
+        matchLabels: or.config.commonLabels,
+      },
+      endpoints: [{ port: 'internal' }],
     },
   },
 }

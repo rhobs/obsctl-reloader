@@ -34,6 +34,8 @@ objects:
       spec:
         containers:
         - args:
+          - --log.level=info
+          - --web.internal.listen=0.0.0.0:8081
           - --sleep-duration-seconds=${SLEEP_DURATION_SECONDS}
           - --observatorium-api-url=${OBSERVATORIUM_URL}
           - --managed-tenants=${MANAGED_TENANTS}
@@ -118,6 +120,25 @@ objects:
   - kind: ServiceAccount
     name: obsctl-reloader
 - apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app.kubernetes.io/component: obsctl-reloader
+      app.kubernetes.io/instance: obsctl-reloader
+      app.kubernetes.io/name: obsctl-reloader
+      app.kubernetes.io/version: latest
+    name: obsctl-reloader
+    namespace: observatorium-stage
+  spec:
+    ports:
+    - name: internal
+      port: 8081
+      targetPort: 8081
+    selector:
+      app.kubernetes.io/component: obsctl-reloader
+      app.kubernetes.io/instance: obsctl-reloader
+      app.kubernetes.io/name: obsctl-reloader
+- apiVersion: v1
   kind: ServiceAccount
   metadata:
     labels:
@@ -127,6 +148,20 @@ objects:
       app.kubernetes.io/version: latest
     name: obsctl-reloader
     namespace: observatorium-stage
+- apiVersion: monitoring.coreos.com/v1
+  kind: ServiceMonitor
+  metadata:
+    name: obsctl-reloader
+    namespace: observatorium-stage
+  spec:
+    endpoints:
+    - port: internal
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: obsctl-reloader
+        app.kubernetes.io/instance: obsctl-reloader
+        app.kubernetes.io/name: obsctl-reloader
+        app.kubernetes.io/version: latest
 parameters:
 - name: IMAGE
   value: quay.io/app-sre/obsctl-reloader
