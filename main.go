@@ -412,9 +412,12 @@ func (o *obsctlRulesSyncer) obsctlLogsAlertingSet(rules lokiv1.AlertingRuleSpec)
 			if len(resp.Body) != 0 {
 				level.Error(o.logger).Log("msg", "setting loki alerting rules", "error", string(resp.Body))
 				o.lokiRulesSetFailures.WithLabelValues("alerting", string(currentTenant)).Inc()
-				return err
+				return errors.Newf("non-200 status code: %v with body: %v", resp.StatusCode(), string(resp.Body))
 			}
+			o.lokiRulesSetFailures.WithLabelValues("alerting", string(currentTenant)).Inc()
+			return errors.Newf("non-200 status code: %v with empty body", resp.StatusCode())
 		}
+
 		level.Debug(o.logger).Log("msg", string(resp.Body))
 		o.lokiRulesSetOps.WithLabelValues("alerting", string(currentTenant)).Inc()
 	}
@@ -450,9 +453,12 @@ func (o *obsctlRulesSyncer) obsctlLogsRecordingSet(rules lokiv1.RecordingRuleSpe
 			if len(resp.Body) != 0 {
 				level.Error(o.logger).Log("msg", "setting loki recording rules", "error", string(resp.Body))
 				o.lokiRulesSetFailures.WithLabelValues("recording", string(currentTenant)).Inc()
-				return err
+				return errors.Newf("non-200 status code: %v with body: %v", resp.StatusCode(), string(resp.Body))
 			}
+			o.lokiRulesSetFailures.WithLabelValues("recording", string(currentTenant)).Inc()
+			return errors.Newf("non-200 status code: %v with empty body", resp.StatusCode())
 		}
+
 		level.Debug(o.logger).Log("msg", string(resp.Body))
 		o.lokiRulesSetOps.WithLabelValues("recording", string(currentTenant)).Inc()
 	}
@@ -503,8 +509,10 @@ func (o *obsctlRulesSyncer) obsctlMetricsSet(rules monitoringv1.PrometheusRuleSp
 		if len(resp.Body) != 0 {
 			level.Error(o.logger).Log("msg", "setting rules", "error", string(resp.Body))
 			o.promRulesSetFailures.WithLabelValues(string(currentTenant)).Inc()
-			return err
+			return errors.Newf("non-200 status code: %v with body: %v", resp.StatusCode(), string(resp.Body))
 		}
+		o.promRulesSetFailures.WithLabelValues(string(currentTenant)).Inc()
+		return errors.Newf("non-200 status code: %v with empty body", resp.StatusCode())
 	}
 
 	o.promRulesSetOps.WithLabelValues(string(currentTenant)).Inc()
