@@ -351,6 +351,7 @@ func (o *obsctlRulesSyncer) initOrReloadObsctlConfig() error {
 	// Add all managed tenants under the API.
 	for _, tenant := range strings.Split(o.managedTenants, ",") {
 		tenantCfg := config.TenantConfig{OIDC: new(config.OIDCConfig)}
+		tenantCfg.OIDC.OfflineAccess = false
 		tenantCfg.Tenant = tenant
 		tenantCfg.OIDC.Audience = o.audience
 		tenantCfg.OIDC.ClientID = os.Getenv(strings.ToUpper(tenant) + "_CLIENT_ID")
