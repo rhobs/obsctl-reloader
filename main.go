@@ -255,7 +255,8 @@ func (o *obsctlRulesSyncer) initOrReloadObsctlConfig() error {
 			// We create a client here to check if config is valid for a particular managed tenant.
 			if _, err := tenantCfg.Client(o.ctx, o.logger); err != nil {
 				level.Error(o.logger).Log("msg", "creating authenticated client", "tenant", tenant, "error", err)
-				return err
+				// Don't block on this error. We can still sync rules for other tenants.
+				continue
 			}
 		}
 
@@ -392,7 +393,14 @@ func (o *obsctlRulesSyncer) obsctlMetricsSet(rules monitoringv1.PrometheusRuleSp
 }
 
 // syncLoop syncs PrometheusRule and Loki's AlertingRule/RecordingRule objects of each managed tenant with Observatorium API every SLEEP_DURATION_SECONDS.
-func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o tenantRulesSyncer, logRulesEnabled bool, sleepDurationSeconds uint) {
+func syncLoop(
+	ctx context.Context,
+	logger log.Logger,
+	k tenantRulesLoader,
+	o tenantRulesSyncer,
+	logRulesEnabled bool,
+	sleepDurationSeconds uint,
+) {
 	for {
 		select {
 		case <-time.After(time.Duration(sleepDurationSeconds) * time.Second):
@@ -406,13 +414,11 @@ func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o ten
 			for tenant, ruleGroups := range k.getTenantMetricsRuleGroups(prometheusRules) {
 				if err := o.setCurrentTenant(tenant); err != nil {
 					level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
-					os.Exit(1)
 				}
 
 				err = o.obsctlMetricsSet(ruleGroups)
 				if err != nil {
 					level.Error(logger).Log("msg", "error setting rules", "tenant", tenant, "error", err)
-					os.Exit(1)
 				}
 			}
 
@@ -426,13 +432,11 @@ func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o ten
 				for tenant, ruleGroups := range k.getTenantLogsAlertingRuleGroups(lokiAlertingRules) {
 					if err := o.setCurrentTenant(tenant); err != nil {
 						level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
-						os.Exit(1)
 					}
 
 					err = o.obsctlLogsAlertingSet(ruleGroups)
 					if err != nil {
 						level.Error(logger).Log("msg", "error setting loki alerting rules", "tenant", tenant, "error", err)
-						os.Exit(1)
 					}
 				}
 
@@ -445,13 +449,11 @@ func syncLoop(ctx context.Context, logger log.Logger, k tenantRulesLoader, o ten
 				for tenant, ruleGroups := range k.getTenantLogsRecordingRuleGroups(lokiRecordingRules) {
 					if err := o.setCurrentTenant(tenant); err != nil {
 						level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
-						os.Exit(1)
 					}
 
 					err = o.obsctlLogsRecordingSet(ruleGroups)
 					if err != nil {
 						level.Error(logger).Log("msg", "error setting loki recording rules", "tenant", tenant, "error", err)
-						os.Exit(1)
 					}
 				}
 			}
