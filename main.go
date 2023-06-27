@@ -26,7 +26,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/prometheus/pkg/rulefmt"
+	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v3"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -277,6 +279,8 @@ type obsctlRulesSyncer struct {
 	ctx             context.Context
 	logger          log.Logger
 	skipClientCheck bool
+	k8s             client.Client
+	namespace       string
 
 	apiURL         string
 	audience       string
@@ -294,13 +298,16 @@ type obsctlRulesSyncer struct {
 func newObsctlRulesSyncer(
 	ctx context.Context,
 	logger log.Logger,
-	apiURL, audience, issuerURL, managedTenants string,
+	kc client.Client,
+	namespace, apiURL, audience, issuerURL, managedTenants string,
 	reg prometheus.Registerer,
 ) *obsctlRulesSyncer {
 	return &obsctlRulesSyncer{
 		ctx:            ctx,
 		logger:         logger,
+		k8s:            kc,
 		apiURL:         apiURL,
+		namespace:      namespace,
 		audience:       audience,
 		issuerURL:      issuerURL,
 		managedTenants: managedTenants,
@@ -322,6 +329,65 @@ func newObsctlRulesSyncer(
 			Help: "Total number of failed obsctl set operations for monitoringv1 rules.",
 		}, []string{"tenant"}),
 	}
+}
+
+func (o *obsctlRulesSyncer) autoDetectTenantSecrets() (map[string]*config.OIDCConfig, error) {
+	tenantSecret := map[string]*config.OIDCConfig{}
+
+	// List secrets.
+	secret := corev1.SecretList{}
+	if err := o.k8s.List(o.ctx, &secret, client.InNamespace(o.namespace)); err != nil {
+		return nil, err
+	}
+
+	// Filter secrets for configured tenants.
+	configuredTenants := strings.Split(o.managedTenants, ",")
+	for i := range secret.Items {
+		lbls := secret.Items[i].Labels
+
+		if _, ok := lbls["tenant"]; !ok {
+			continue
+		}
+
+		// If tenant is not configured, skip.
+		if !slices.Contains(configuredTenants, lbls["tenant"]) {
+			continue
+		}
+
+		if secret.Items[i].Data == nil {
+			continue
+		}
+
+		tOIDC := &config.OIDCConfig{
+			Audience:      o.audience,
+			IssuerURL:     o.issuerURL,
+			OfflineAccess: false,
+		}
+
+		// Get tenant credentials from secret.
+		// TODO: Define spec for secrets. Currently can be both underscore and dash.
+		if cd, ok := secret.Items[i].Data["client_id"]; ok {
+			tOIDC.ClientID = string(cd)
+		}
+		if cd, ok := secret.Items[i].Data["client-id"]; ok {
+			tOIDC.ClientID = string(cd)
+		}
+		if cs, ok := secret.Items[i].Data["client_secret"]; ok {
+			tOIDC.ClientSecret = string(cs)
+		}
+		if cs, ok := secret.Items[i].Data["client-secret"]; ok {
+			tOIDC.ClientSecret = string(cs)
+		}
+
+		// Skip if secret is missing credentials.
+		if tOIDC.ClientSecret == "" || tOIDC.ClientID == "" {
+			continue
+		}
+
+		tenantSecret[lbls["tenant"]] = tOIDC
+	}
+
+	return tenantSecret, nil
 }
 
 // InitOrReloadObsctlConfig reads config from disk if present, or initializes one based on env vars.
@@ -348,15 +414,16 @@ func (o *obsctlRulesSyncer) initOrReloadObsctlConfig() error {
 		return errors.Wrap(err, "adding new API to obsctl config")
 	}
 
+	tenantSecrets, err := o.autoDetectTenantSecrets()
+	if err != nil {
+		level.Error(o.logger).Log("msg", "auto detecting tenant secrets", "error", err)
+		return errors.Wrap(err, "auto detecting tenant secrets")
+	}
+
 	// Add all managed tenants under the API.
-	for _, tenant := range strings.Split(o.managedTenants, ",") {
-		tenantCfg := config.TenantConfig{OIDC: new(config.OIDCConfig)}
-		tenantCfg.OIDC.OfflineAccess = false
+	for tenant, oidc := range tenantSecrets {
+		tenantCfg := config.TenantConfig{OIDC: oidc}
 		tenantCfg.Tenant = tenant
-		tenantCfg.OIDC.Audience = o.audience
-		tenantCfg.OIDC.ClientID = os.Getenv(strings.ToUpper(tenant) + "_CLIENT_ID")
-		tenantCfg.OIDC.ClientSecret = os.Getenv(strings.ToUpper(tenant) + "_CLIENT_SECRET")
-		tenantCfg.OIDC.IssuerURL = o.issuerURL
 
 		if !o.skipClientCheck {
 			// We create a client here to check if config is valid for a particular managed tenant.
@@ -711,6 +778,8 @@ func main() {
 	o := newObsctlRulesSyncer(
 		ctx,
 		log.With(logger, "component", "obsctl-syncer"),
+		k8sClient,
+		namespace,
 		cfg.observatoriumURL,
 		cfg.audience,
 		cfg.issuerURL,

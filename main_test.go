@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/efficientgo/tools/core/pkg/testutil"
+	"github.com/efficientgo/core/testutil"
 	"github.com/go-kit/log"
 	lokiv1 "github.com/grafana/loki/operator/apis/loki/v1"
 	"github.com/observatorium/obsctl/pkg/config"
