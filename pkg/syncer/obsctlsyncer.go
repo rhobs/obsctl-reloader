@@ -40,6 +40,11 @@ type ObsctlRulesSyncer struct {
 	issuerURL      string
 	managedTenants string
 
+	autoDetectSecretsFn func(ctx context.Context,
+		k8s client.Client,
+		namespace, audience, issuerURL, managedTenants string,
+	) (map[string]*config.OIDCConfig, error)
+
 	c *config.Config
 
 	lokiRulesSetOps      *prometheus.CounterVec
@@ -65,6 +70,8 @@ func NewObsctlRulesSyncer(
 		issuerURL:      issuerURL,
 		managedTenants: managedTenants,
 
+		autoDetectSecretsFn: AutoDetectTenantSecrets,
+
 		lokiRulesSetOps: promauto.With(reg).NewCounterVec(prometheus.CounterOpts{
 			Name: "obsctl_reloader_loki_rule_sets_total",
 			Help: "Total number of obsctl set operations for lokiv1/v1beta1 rules.",
@@ -84,17 +91,21 @@ func NewObsctlRulesSyncer(
 	}
 }
 
-func (o *ObsctlRulesSyncer) autoDetectTenantSecrets() (map[string]*config.OIDCConfig, error) {
+func AutoDetectTenantSecrets(
+	ctx context.Context,
+	k8s client.Client,
+	namespace, audience, issuerURL, managedTenants string,
+) (map[string]*config.OIDCConfig, error) {
 	tenantSecret := map[string]*config.OIDCConfig{}
 
 	// List secrets.
 	secret := corev1.SecretList{}
-	if err := o.k8s.List(o.ctx, &secret, client.InNamespace(o.namespace)); err != nil {
+	if err := k8s.List(ctx, &secret, client.InNamespace(namespace)); err != nil {
 		return nil, err
 	}
 
 	// Filter secrets for configured tenants.
-	configuredTenants := strings.Split(o.managedTenants, ",")
+	configuredTenants := strings.Split(managedTenants, ",")
 	for i := range secret.Items {
 		lbls := secret.Items[i].Labels
 
@@ -112,8 +123,8 @@ func (o *ObsctlRulesSyncer) autoDetectTenantSecrets() (map[string]*config.OIDCCo
 		}
 
 		tOIDC := &config.OIDCConfig{
-			Audience:      o.audience,
-			IssuerURL:     o.issuerURL,
+			Audience:      audience,
+			IssuerURL:     issuerURL,
 			OfflineAccess: false,
 		}
 
@@ -167,7 +178,7 @@ func (o *ObsctlRulesSyncer) InitOrReloadObsctlConfig() error {
 		return errors.Wrap(err, "adding new API to obsctl config")
 	}
 
-	tenantSecrets, err := o.autoDetectTenantSecrets()
+	tenantSecrets, err := o.autoDetectSecretsFn(o.ctx, o.k8s, o.namespace, o.audience, o.issuerURL, o.managedTenants)
 	if err != nil {
 		level.Error(o.logger).Log("msg", "auto detecting tenant secrets", "error", err)
 		return errors.Wrap(err, "auto detecting tenant secrets")
