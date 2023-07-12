@@ -20,6 +20,7 @@ import (
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -98,9 +99,20 @@ func AutoDetectTenantSecrets(
 ) (map[string]*config.OIDCConfig, error) {
 	tenantSecret := map[string]*config.OIDCConfig{}
 
-	// List secrets.
+	// List secrets by filtered with tenant label.
+	ls, err := metav1.LabelSelectorAsSelector(
+		&metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{{
+				Key:      "tenant",
+				Operator: metav1.LabelSelectorOpExists,
+			}},
+		})
+	if err != nil {
+		return nil, err
+	}
+
 	secret := corev1.SecretList{}
-	if err := k8s.List(ctx, &secret, client.InNamespace(namespace)); err != nil {
+	if err := k8s.List(ctx, &secret, client.InNamespace(namespace), client.MatchingLabelsSelector{Selector: ls}); err != nil {
 		return nil, err
 	}
 
