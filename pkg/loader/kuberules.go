@@ -17,7 +17,8 @@ import (
 
 var _ RulesLoader = &KubeRulesLoader{}
 
-// KubeRulesLoader implements RulesLoader interface.
+// KubeRulesLoader implements RulesLoader interface, and loads Prometheus and Loki rules
+// from the Kubernetes API via respective CRDs.
 type KubeRulesLoader struct {
 	ctx            context.Context
 	k8s            client.Client
