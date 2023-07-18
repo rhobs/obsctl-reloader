@@ -47,28 +47,6 @@ objects:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
-          - name: RHOBS_CLIENT_ID
-            valueFrom:
-              secretKeyRef:
-                key: client_id
-                name: ${RHOBS_SECRET_NAME}
-          - name: OSD_CLIENT_ID
-            valueFrom:
-              secretKeyRef:
-                key: client-id
-                name: ${OSD_SECRET_NAME}
-                optional: true
-          - name: RHOBS_CLIENT_SECRET
-            valueFrom:
-              secretKeyRef:
-                key: client_secret
-                name: ${RHOBS_SECRET_NAME}
-          - name: OSD_CLIENT_SECRET
-            valueFrom:
-              secretKeyRef:
-                key: client-secret
-                name: ${OSD_SECRET_NAME}
-                optional: true
           image: ${IMAGE}:${IMAGE_TAG}
           imagePullPolicy: IfNotPresent
           name: obsctl-reloader
