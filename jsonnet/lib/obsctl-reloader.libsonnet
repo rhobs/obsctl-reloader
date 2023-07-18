@@ -22,7 +22,6 @@ local defaults = {
     managedTenants: '${MANAGED_TENANTS}',
     logRulesEnabled: 'true',
   },
-  tenantSecretMap: error 'must provide tenantSecretMap',
   resources: {},
 
   commonLabels:: {
@@ -47,7 +46,6 @@ function(params) {
   // Safety checks for combined config of defaults and params
   assert std.isObject(or.config.resources),
   assert std.isObject(or.config.env),
-  assert std.isArray(or.config.tenantSecretMap),
 
   serviceAccount: {
     apiVersion: 'v1',
@@ -168,30 +166,6 @@ function(params) {
                     },
                   },
                 },
-              ] + [
-                {
-                  name: t.tenant + '_CLIENT_ID',
-                  valueFrom: {
-                    secretKeyRef: {
-                      name: t.secret,
-                      key: t.idKey,
-                      [if std.objectHas(t, 'optional') then 'optional' else null]: true,
-                    },
-                  },
-                }
-                for t in or.config.tenantSecretMap
-              ] + [
-                {
-                  name: t.tenant + '_CLIENT_SECRET',
-                  valueFrom: {
-                    secretKeyRef: {
-                      name: t.secret,
-                      key: t.secretKey,
-                      [if std.objectHas(t, 'optional') then 'optional' else null]: true,
-                    },
-                  },
-                }
-                for t in or.config.tenantSecretMap
               ],
             },
           ],
