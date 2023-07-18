@@ -23,3 +23,8 @@ Usage of obsctl-reloader:
 ```
 
 > Note: this project is still experimental.
+
+The tenant K8s secret must have a `tenant` metadata label and the following data fields, for it to be auto-detected by obsctl-reloader.
+
+- `client-id` or `client_id` 
+- `client-secret` or `client_secret`

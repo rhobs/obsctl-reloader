@@ -15,6 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var _ RulesLoader = &KubeRulesLoader{}
+
 // KubeRulesLoader implements RulesLoader interface.
 type KubeRulesLoader struct {
 	ctx            context.Context

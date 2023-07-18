@@ -28,6 +28,8 @@ const (
 	obsctlContextAPIName = "api"
 )
 
+var _ RulesSyncer = &ObsctlRulesSyncer{}
+
 // ObsctlRulesSyncer implements RulesSyncer interface to sync rules to Observatorium API.
 type ObsctlRulesSyncer struct {
 	ctx             context.Context
