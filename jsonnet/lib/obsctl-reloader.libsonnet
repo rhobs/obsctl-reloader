@@ -76,6 +76,11 @@ function(params) {
         resources: ['alertingrules', 'recordingrules'],
         verbs: ['get', 'list', 'watch'],
       },
+      {
+        apiGroups: [''],
+        resources: ['secrets'],
+        verbs: ['get', 'list', 'watch'],
+      },
     ],
   },
 
