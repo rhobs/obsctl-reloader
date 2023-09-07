@@ -55,7 +55,7 @@ type ObsctlRulesSyncer struct {
 	promRulesSetOps      *prometheus.CounterVec
 	lokiRulesSetFailures *prometheus.CounterVec
 	promRulesSetFailures *prometheus.CounterVec
-	promDownstreamOps    *prometheus.CounterVec
+	promRulesStoreOps    *prometheus.CounterVec
 }
 
 func NewObsctlRulesSyncer(
@@ -93,8 +93,8 @@ func NewObsctlRulesSyncer(
 			Name: "obsctl_reloader_prom_rule_set_failures_total",
 			Help: "Total number of failed obsctl set operations for monitoringv1 rules.",
 		}, []string{"tenant", "reason"}),
-		promDownstreamOps: promauto.With(reg).NewCounterVec(prometheus.CounterOpts{
-			Name: "obsctl_reloader_prom_rule_set_downstream_ops_total",
+		promRulesStoreOps: promauto.With(reg).NewCounterVec(prometheus.CounterOpts{
+			Name: "obsctl_reloader_prom_rules_store_ops_total",
 			Help: "Total number of downstream requests to store prometheus rules.",
 		}, []string{"tenant", "status_code"}),
 	}
@@ -357,7 +357,7 @@ func (o *ObsctlRulesSyncer) MetricsSet(rules monitoringv1.PrometheusRuleSpec) er
 		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "getting_response").Inc()
 		return err
 	}
-	o.promDownstreamOps.WithLabelValues(string(currentTenant), strconv.Itoa(resp.StatusCode())).Inc()
+	o.promRulesStoreOps.WithLabelValues(string(currentTenant), strconv.Itoa(resp.StatusCode())).Inc()
 
 	if resp.StatusCode()/100 != 2 {
 		if len(resp.Body) != 0 {
