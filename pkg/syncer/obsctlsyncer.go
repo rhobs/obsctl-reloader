@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/efficientgo/core/errors"
@@ -322,13 +323,14 @@ func (o *ObsctlRulesSyncer) MetricsSet(rules monitoringv1.PrometheusRuleSpec) er
 	fc, currentTenant, err := fetcher.NewCustomFetcher(o.ctx, o.logger)
 	if err != nil {
 		level.Error(o.logger).Log("msg", "getting fetcher client", "error", err)
+		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "get_fetcher_client").Inc()
 		return errors.Wrap(err, "getting fetcher client")
 	}
 
 	ruleGroups, err := json.Marshal(rules)
 	if err != nil {
 		level.Error(o.logger).Log("msg", "converting monitoringv1 rules to json", "error", err)
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant)).Inc()
+		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "converting_to_json").Inc()
 		return errors.Wrap(err, "converting monitoringv1 rules to json")
 	}
 
@@ -337,14 +339,14 @@ func (o *ObsctlRulesSyncer) MetricsSet(rules monitoringv1.PrometheusRuleSpec) er
 		for e := range errs {
 			level.Error(o.logger).Log("msg", "rulefmt parsing rules", "error", e, "groups", groups)
 		}
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant)).Inc()
+		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "parsing_rules").Inc()
 		return errors.Wrap(errs[0], "rulefmt parsing rules")
 	}
 
 	body, err := yaml.Marshal(groups)
 	if err != nil {
 		level.Error(o.logger).Log("msg", "converting rulefmt rules to yaml", "error", err)
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant)).Inc()
+		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "converting_to_yaml").Inc()
 		return errors.Wrap(err, "converting rulefmt rules to yaml")
 	}
 
@@ -352,7 +354,7 @@ func (o *ObsctlRulesSyncer) MetricsSet(rules monitoringv1.PrometheusRuleSpec) er
 	resp, err := fc.SetRawRulesWithBodyWithResponse(o.ctx, currentTenant, "application/yaml", bytes.NewReader(body))
 	if err != nil {
 		level.Error(o.logger).Log("msg", "getting response", "error", err)
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant)).Inc()
+		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "getting_response").Inc()
 		return err
 	}
 	o.promDownstreamOps.WithLabelValues(string(currentTenant), strconv.Itoa(resp.StatusCode())).Inc()
@@ -360,10 +362,10 @@ func (o *ObsctlRulesSyncer) MetricsSet(rules monitoringv1.PrometheusRuleSpec) er
 	if resp.StatusCode()/100 != 2 {
 		if len(resp.Body) != 0 {
 			level.Error(o.logger).Log("msg", "setting rules", "error", string(resp.Body))
-			o.promRulesSetFailures.WithLabelValues(string(currentTenant)).Inc()
+			o.promRulesSetFailures.WithLabelValues(string(currentTenant), "rules_store_error").Inc()
 			return errors.Newf("non-200 status code: %v with body: %v", resp.StatusCode(), string(resp.Body))
 		}
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant)).Inc()
+		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "rules_store_error").Inc()
 		return errors.Newf("non-200 status code: %v with empty body", resp.StatusCode())
 	}
 
