@@ -1,7 +1,7 @@
 groups:
 - name: obsctl-reloader.rules
   rules:
-  - alert: ObsCtlRulesStoreInternalServerError
+  - alert: ObsCtlRulesStoreServerError
     annotations:
       description: Failed to send rules from tenant {{ $labels.tenant }} to store {{ $value | humanizePercentage }}% of the time with a 5xx or 4xx status code.
       summary: Failing to send rules to Observatorium.
