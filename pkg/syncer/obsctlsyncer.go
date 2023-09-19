@@ -321,6 +321,8 @@ func (o *ObsctlRulesSyncer) LogsRecordingSet(rules lokiv1.RecordingRuleSpec) err
 func (o *ObsctlRulesSyncer) MetricsSet(rules monitoringv1.PrometheusRuleSpec) error {
 	level.Debug(o.logger).Log("msg", "setting metrics for tenant")
 	fc, currentTenant, err := fetcher.NewCustomFetcher(o.ctx, o.logger)
+	o.promRulesSetOps.WithLabelValues(string(currentTenant)).Inc()
+
 	if err != nil {
 		level.Error(o.logger).Log("msg", "getting fetcher client", "error", err)
 		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "get_fetcher_client").Inc()
@@ -369,7 +371,6 @@ func (o *ObsctlRulesSyncer) MetricsSet(rules monitoringv1.PrometheusRuleSpec) er
 		return errors.Newf("non-200 status code: %v with empty body", resp.StatusCode())
 	}
 
-	o.promRulesSetOps.WithLabelValues(string(currentTenant)).Inc()
 	level.Debug(o.logger).Log("msg", string(resp.Body))
 
 	return nil
