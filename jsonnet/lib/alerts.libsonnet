@@ -5,12 +5,12 @@
         name: 'obsctl-reloader.rules',
         rules: [
           {
-            alert: 'ObsCtlRulesStoreInternalServerError',
+            alert: 'ObsCtlRulesStoreServerError',
             expr: |||
               (
                 sum_over_time(obsctl_reloader_prom_rules_store_ops_total{status_code=~"5..|4..", %(obsctlReloaderSelector)s}[5m])
               /
-                sum_over_time(obsctl_reloader_prom_rules_store_ops_total{status_code=~"2..", %(obsctlReloaderSelector)s}[5m])
+                sum(sum_over_time(obsctl_reloader_prom_rules_store_ops_total{%(obsctlReloaderSelector)s}[5m]))
               ) or vector(0)
               > 0.10
             ||| % $._config,
@@ -48,7 +48,7 @@
               (
                 sum_over_time(obsctl_reloader_prom_rules_store_ops_total{status_code=~"403", %(obsctlReloaderSelector)s}[5m])
               /
-                sum_over_time(obsctl_reloader_prom_rules_store_ops_total{status_code=~"2..", %(obsctlReloaderSelector)s}[5m])
+                sum_over_time(obsctl_reloader_prom_rules_store_ops_total{%(obsctlReloaderSelector)s}[5m])
               ) or vector(0)
               > 0.10
             ||| % $._config,
