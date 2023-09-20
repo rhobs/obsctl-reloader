@@ -24,44 +24,6 @@
             },
           },
           {
-            alert: 'ObsCtlRulesSetFailure',
-            expr: |||
-              (
-                sum_over_time(obsctl_reloader_prom_rule_set_failures_total{%(obsctlReloaderSelector)s}[5m])
-              /
-                sum_over_time(obsctl_reloader_prom_rule_set_total{%(obsctlReloaderSelector)s}[5m])
-              ) or vector(0)
-              > 0.10
-            ||| % $._config,
-            'for': '10m',
-            labels: {
-              severity: 'warning',
-            },
-            annotations: {
-              summary: 'Failing to set rules in the rules store.',
-              description: 'obsctl-reloader is failing to set rules for tenant {{ $labels.tenant }} in the rules store {{ $value | humanizePercentage }}% of the time due to {{ $labels.reason }}.',
-            },
-          },
-          {
-            alert: 'ObsCtlRulesStoreAuthenticationError',
-            expr: |||
-              (
-                sum_over_time(obsctl_reloader_prom_rules_store_ops_total{status_code=~"403", %(obsctlReloaderSelector)s}[5m])
-              /
-                sum_over_time(obsctl_reloader_prom_rules_store_ops_total{%(obsctlReloaderSelector)s}[5m])
-              ) or vector(0)
-              > 0.10
-            ||| % $._config,
-            'for': '10m',
-            labels: {
-              severity: 'warning',
-            },
-            annotations: {
-              summary: 'Failing to authenticate tenant with Observatorium.',
-              description: 'Failed to authenticate tenant {{ $labels.tenant }} with Observatorium.',
-            },
-          },
-          {
             alert: 'ObsCtlFetchRulesFailed',
             expr: |||
               (
