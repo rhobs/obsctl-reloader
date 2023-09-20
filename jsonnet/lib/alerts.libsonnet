@@ -24,6 +24,25 @@
             },
           },
           {
+            alert: 'ObsCtlRulesSetFailure',
+            expr: |||
+              (
+                sum_over_time(obsctl_reloader_prom_rule_set_failures_total{reason!="rules_store_error", %(obsctlReloaderSelector)s}[5m])
+              /
+                sum_over_time(obsctl_reloader_prom_rule_set_total{reason!="rules_store_error", %(obsctlReloaderSelector)s}[5m])
+              ) or vector(0)
+              > 0.10
+            ||| % $._config,
+            'for': '10m',
+            labels: {
+              severity: 'warning',
+            },
+            annotations: {
+              summary: 'Failing to set rules in the rules store.',
+              description: 'obsctl-reloader is failing to set rules for tenant {{ $labels.tenant }} before reaching Observatorium {{ $value | humanizePercentage }}% of the time due to {{ $labels.reason }}.',
+            },
+          },
+          {
             alert: 'ObsCtlFetchRulesFailed',
             expr: |||
               (

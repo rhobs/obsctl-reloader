@@ -15,6 +15,20 @@ groups:
     for: 10m
     labels:
       severity: critical
+  - alert: ObsCtlRulesSetFailure
+    annotations:
+      description: obsctl-reloader is failing to set rules for tenant {{ $labels.tenant }} before reaching Observatorium {{ $value | humanizePercentage }}% of the time due to {{ $labels.reason }}.
+      summary: Failing to set rules in the rules store.
+    expr: |
+      (
+        sum_over_time(obsctl_reloader_prom_rule_set_failures_total{reason!="rules_store_error", job="obsctl-reloader"}[5m])
+      /
+        sum_over_time(obsctl_reloader_prom_rule_set_total{reason!="rules_store_error", job="obsctl-reloader"}[5m])
+      ) or vector(0)
+      > 0.10
+    for: 10m
+    labels:
+      severity: warning
   - alert: ObsCtlFetchRulesFailed
     annotations:
       description: obsctl-reloader is failing to fetch rules via the PrometheusRule CRD in the local cluster.
