@@ -38,7 +38,7 @@
               severity: 'warning',
             },
             annotations: {
-              summary: 'Failing to set rules due to issue beforetalking to Observatorium.',
+              summary: 'Failing to set rules due to issue before talking to Observatorium.',
               description: 'obsctl-reloader is failing to set rules for tenant {{ $labels.tenant }} before reaching Observatorium {{ $value | humanizePercentage }}% of the time due to {{ $labels.reason }}.',
             },
           },
