@@ -18,7 +18,7 @@ groups:
   - alert: ObsCtlRulesSetFailure
     annotations:
       description: obsctl-reloader is failing to set rules for tenant {{ $labels.tenant }} before reaching Observatorium {{ $value | humanizePercentage }}% of the time due to {{ $labels.reason }}.
-      summary: Failing to set rules due to issue beforetalking to Observatorium.
+before talking
     expr: |
       (
         sum_over_time(obsctl_reloader_prom_rule_set_failures_total{reason!="rules_store_error", job="obsctl-reloader"}[5m])
