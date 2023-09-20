@@ -29,7 +29,7 @@
               (
                 sum_over_time(obsctl_reloader_prom_rule_set_failures_total{reason!="rules_store_error", %(obsctlReloaderSelector)s}[5m])
               /
-                sum_over_time(obsctl_reloader_prom_rule_set_total{reason!="rules_store_error", %(obsctlReloaderSelector)s}[5m])
+                sum_over_time(obsctl_reloader_prom_rule_set_total{%(obsctlReloaderSelector)s}[5m])
               ) or vector(0)
               > 0.10
             ||| % $._config,

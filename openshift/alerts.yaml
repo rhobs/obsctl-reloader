@@ -23,7 +23,7 @@ groups:
       (
         sum_over_time(obsctl_reloader_prom_rule_set_failures_total{reason!="rules_store_error", job="obsctl-reloader"}[5m])
       /
-        sum_over_time(obsctl_reloader_prom_rule_set_total{reason!="rules_store_error", job="obsctl-reloader"}[5m])
+        sum_over_time(obsctl_reloader_prom_rule_set_total{job="obsctl-reloader"}[5m])
       ) or vector(0)
       > 0.10
     for: 10m
