@@ -123,8 +123,12 @@ lint: $(FAILLINT) $(GOLANGCI_LINT) $(MISSPELL) format check-git deps
 	@find . -type f | grep -v vendor/ | grep -vE '\./\..*' | xargs $(MISSPELL) -error
 
 .PHONY: manifests
-manifests: openshift/template.yaml
+manifests: template alerts
 
-openshift/template.yaml: openshift/template.jsonnet $(JSONNET) $(GOJSONTOYAML)
-	-rm -rf openshift/template.yaml
-	$(JSONNET) openshift/template.jsonnet | $(GOJSONTOYAML) > $@
+.PHONY: template
+template: $(JSONNET) $(GOJSONTOYAML)
+	$(JSONNET) openshift/template.jsonnet | $(GOJSONTOYAML) > openshift/template.yaml
+
+.PHONY: alerts
+alerts: $(JSONNET) $(GOJSONTOYAML)
+	$(JSONNET) openshift/alerts.jsonnet | $(GOJSONTOYAML) > openshift/alerts.yaml
