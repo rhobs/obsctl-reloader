@@ -11,7 +11,7 @@
                 sum_over_time(obsctl_reloader_prom_rules_store_ops_total{status_code=~"5..|4..", %(obsctlReloaderSelector)s}[5m])
               /
                 sum(sum_over_time(obsctl_reloader_prom_rules_store_ops_total{%(obsctlReloaderSelector)s}[5m]))
-              ) or vector(0)
+              )
               > 0.10
             ||| % $._config,
             'for': '10m',
@@ -30,7 +30,7 @@
                 sum_over_time(obsctl_reloader_prom_rule_set_failures_total{reason!="rules_store_error", %(obsctlReloaderSelector)s}[5m])
               /
                 sum_over_time(obsctl_reloader_prom_rule_set_total{%(obsctlReloaderSelector)s}[5m])
-              ) or vector(0)
+              )
               > 0.10
             ||| % $._config,
             'for': '10m',
@@ -49,7 +49,7 @@
                 sum_over_time(obsctl_reloader_prom_rule_fetch_failures_total{%(obsctlReloaderSelector)s}[5m])
               /
                 sum_over_time(obsctl_reloader_prom_rule_fetches_total{%(obsctlReloaderSelector)s}[5m])
-              ) or vector(0)
+              )
               > 0.20
             ||| % $._config,
             'for': '5m',
