@@ -10,7 +10,7 @@ groups:
         sum_over_time(obsctl_reloader_prom_rules_store_ops_total{status_code=~"5..|4..", job="obsctl-reloader"}[5m])
       /
         sum(sum_over_time(obsctl_reloader_prom_rules_store_ops_total{job="obsctl-reloader"}[5m]))
-      ) or vector(0)
+      )
       > 0.10
     for: 10m
     labels:
@@ -24,7 +24,7 @@ groups:
         sum_over_time(obsctl_reloader_prom_rule_set_failures_total{reason!="rules_store_error", job="obsctl-reloader"}[5m])
       /
         sum_over_time(obsctl_reloader_prom_rule_set_total{job="obsctl-reloader"}[5m])
-      ) or vector(0)
+      )
       > 0.10
     for: 10m
     labels:
@@ -38,7 +38,7 @@ groups:
         sum_over_time(obsctl_reloader_prom_rule_fetch_failures_total{job="obsctl-reloader"}[5m])
       /
         sum_over_time(obsctl_reloader_prom_rule_fetches_total{job="obsctl-reloader"}[5m])
-      ) or vector(0)
+      )
       > 0.20
     for: 5m
     labels:
