@@ -1,6 +1,15 @@
 groups:
 - name: obsctl-reloader.rules
   rules:
+  - alert: ObsCtlIsDown
+    annotations:
+      description: obsctl-reloader is down.
+      summary: obsctl-reloader is down. Tenants rules are not being reloaded.
+    expr: |
+      (up{job="obsctl-reloader"} == 0)
+    for: 5m
+    labels:
+      severity: critical
   - alert: ObsCtlRulesStoreServerError
     annotations:
       description: Failed to send rules from tenant {{ $labels.tenant }} to store {{ $value | humanizePercentage }}% of the time with a 5xx or 4xx status code.
