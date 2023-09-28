@@ -5,6 +5,20 @@
         name: 'obsctl-reloader.rules',
         rules: [
           {
+            alert: 'ObsCtlIsDown',
+            expr: |||
+              (up{%(obsctlReloaderSelector)s} == 0)
+            ||| % $._config,
+            'for': '5m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              summary: 'obsctl-reloader is down. Tenants rules are not being reloaded.',
+              description: 'obsctl-reloader is down.',
+            },
+          },
+          {
             alert: 'ObsCtlRulesStoreServerError',
             expr: |||
               (
