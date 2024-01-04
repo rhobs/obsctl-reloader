@@ -10,6 +10,7 @@ import (
 	"github.com/go-kit/log"
 	lokiv1 "github.com/grafana/loki/operator/apis/loki/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
 	"github.com/rhobs/obsctl-reloader/pkg/loop"
 )
 
@@ -82,7 +83,7 @@ func TestSyncLoop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(25*time.Second, func() { cancel() })
 
-	testutil.Ok(t, loop.SyncLoop(ctx, log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), rl, rs, true, 5))
+	testutil.Ok(t, loop.SyncLoop(ctx, log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), rl, rs, true, 5, 0))
 
 	testutil.Equals(t, 12, rs.setCurrentTenantCnt)
 	testutil.Equals(t, 4, rs.metricsRulesCnt)

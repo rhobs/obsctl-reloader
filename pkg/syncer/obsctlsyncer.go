@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/efficientgo/core/errors"
 	"github.com/go-kit/log"
@@ -49,7 +50,8 @@ type ObsctlRulesSyncer struct {
 		namespace, audience, issuerURL, managedTenants string,
 	) (map[string]*config.OIDCConfig, error)
 
-	c *config.Config
+	c                 *config.Config
+	configReloadMutex sync.Mutex
 
 	lokiRulesSetOps      *prometheus.CounterVec
 	promRulesSetOps      *prometheus.CounterVec
@@ -66,14 +68,15 @@ func NewObsctlRulesSyncer(
 	reg prometheus.Registerer,
 ) *ObsctlRulesSyncer {
 	return &ObsctlRulesSyncer{
-		ctx:            ctx,
-		logger:         logger,
-		k8s:            kc,
-		apiURL:         apiURL,
-		namespace:      namespace,
-		audience:       audience,
-		issuerURL:      issuerURL,
-		managedTenants: managedTenants,
+		ctx:               ctx,
+		configReloadMutex: sync.Mutex{},
+		logger:            logger,
+		k8s:               kc,
+		apiURL:            apiURL,
+		namespace:         namespace,
+		audience:          audience,
+		issuerURL:         issuerURL,
+		managedTenants:    managedTenants,
 
 		autoDetectSecretsFn: AutoDetectTenantSecrets,
 
@@ -176,6 +179,8 @@ func AutoDetectTenantSecrets(
 
 // InitOrReloadObsctlConfig reads config from disk if present, or initializes one based on env vars.
 func (o *ObsctlRulesSyncer) InitOrReloadObsctlConfig() error {
+	o.configReloadMutex.Lock()
+	defer o.configReloadMutex.Unlock()
 	// Check if config is already present on disk.
 	cfg, err := config.Read(o.logger)
 	if err != nil {
@@ -228,6 +233,8 @@ func (o *ObsctlRulesSyncer) InitOrReloadObsctlConfig() error {
 }
 
 func (o *ObsctlRulesSyncer) SetCurrentTenant(tenant string) error {
+	o.configReloadMutex.Lock()
+	defer o.configReloadMutex.Unlock()
 	if err := o.c.SetCurrentContext(o.logger, obsctlContextAPIName, tenant); err != nil {
 		level.Error(o.logger).Log("msg", "switching context", "tenant", tenant, "error", err)
 		return err

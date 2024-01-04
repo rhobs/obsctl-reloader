@@ -6,22 +6,20 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+
 	"github.com/rhobs/obsctl-reloader/pkg/loader"
 	"github.com/rhobs/obsctl-reloader/pkg/syncer"
 )
 
 // SyncLoop represents the main loop of this controller, which syncs PrometheusRule and Loki's AlertingRule/RecordingRule
 // objects of each managed tenant with Observatorium API every n seconds.
-func SyncLoop(
-	ctx context.Context,
-	logger log.Logger,
-	k loader.RulesLoader,
-	o syncer.RulesSyncer,
-	logRulesEnabled bool,
-	sleepDurationSeconds uint,
-) error {
+func SyncLoop(ctx context.Context, logger log.Logger, k loader.RulesLoader, o syncer.RulesSyncer, logRulesEnabled bool, sleepDurationSeconds uint, configReloadIntervalSeconds uint) error {
 	for {
 		select {
+		case <-time.After(time.Duration(configReloadIntervalSeconds) * time.Second):
+			if err := o.InitOrReloadObsctlConfig(); err != nil {
+				level.Error(logger).Log("msg", "error reloading obsctl config", "error", err)
+			}
 		case <-time.After(time.Duration(sleepDurationSeconds) * time.Second):
 			prometheusRules, err := k.GetPrometheusRules()
 			if err != nil {

@@ -16,18 +16,20 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/rhobs/obsctl-reloader/pkg/loader"
-	"github.com/rhobs/obsctl-reloader/pkg/loop"
-	"github.com/rhobs/obsctl-reloader/pkg/syncer"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	k8sconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
+
+	"github.com/rhobs/obsctl-reloader/pkg/loader"
+	"github.com/rhobs/obsctl-reloader/pkg/loop"
+	"github.com/rhobs/obsctl-reloader/pkg/syncer"
 )
 
 const (
-	obsctlContextAPIName        = "api"
-	defaultSleepDurationSeconds = 15
+	obsctlContextAPIName               = "api"
+	defaultSleepDurationSeconds        = 15
+	defaultConfigReloadIntervalSeconds = 60
 )
 
 type cfg struct {
@@ -39,6 +41,7 @@ type cfg struct {
 	logRulesEnabled      bool
 	logLevel             string
 	listenInternal       string
+	configReloadInterval uint
 }
 
 func setupLogger(logLevel string) log.Logger {
@@ -68,6 +71,7 @@ func parseFlags() *cfg {
 
 	// Common flags.
 	flag.UintVar(&cfg.sleepDurationSeconds, "sleep-duration-seconds", defaultSleepDurationSeconds, "The interval in seconds after which all PrometheusRules are synced to Observatorium API.")
+	flag.UintVar(&cfg.configReloadInterval, "config-reload-interval-seconds", defaultConfigReloadIntervalSeconds, "The interval in seconds for reloading configuration.")
 	flag.StringVar(&cfg.observatoriumURL, "observatorium-api-url", "", "The URL of the Observatorium API to which rules will be synced.")
 	flag.StringVar(&cfg.managedTenants, "managed-tenants", "", "The name of the tenants whose rules should be synced. If there are multiple tenants, ensure they are comma-separated.")
 	flag.StringVar(&cfg.issuerURL, "issuer-url", "", "The OIDC issuer URL, see https://openid.net/specs/openid-connect-discovery-1_0.html#IssuerDiscovery.")
@@ -149,7 +153,7 @@ func main() {
 		reg,
 	)
 	if err := o.InitOrReloadObsctlConfig(); err != nil {
-		level.Error(logger).Log("msg", "error reloading/initializing obsctl config", "error", err)
+		level.Error(logger).Log("msg", "error initializing obsctl config", "error", err)
 		panic(err)
 	}
 
@@ -165,6 +169,7 @@ func main() {
 				o,
 				cfg.logRulesEnabled,
 				cfg.sleepDurationSeconds,
+				cfg.configReloadInterval,
 			)
 		}, func(_ error) {
 			cancel()
