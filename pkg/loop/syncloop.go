@@ -13,7 +13,15 @@ import (
 
 // SyncLoop represents the main loop of this controller, which syncs PrometheusRule and Loki's AlertingRule/RecordingRule
 // objects of each managed tenant with Observatorium API every n seconds.
-func SyncLoop(ctx context.Context, logger log.Logger, k loader.RulesLoader, o syncer.RulesSyncer, logRulesEnabled bool, sleepDurationSeconds uint, configReloadIntervalSeconds uint) error {
+func SyncLoop(
+	ctx context.Context,
+	logger log.Logger,
+	k loader.RulesLoader,
+	o syncer.RulesSyncer,
+	logRulesEnabled bool,
+	sleepDurationSeconds uint,
+	configReloadIntervalSeconds uint,
+) error {
 	for {
 		select {
 		case <-time.After(time.Duration(configReloadIntervalSeconds) * time.Second):
