@@ -19,6 +19,7 @@ local defaults = {
     oidcAudience: '${OIDC_AUDIENCE}',
     oidcIssuerURL: '${OIDC_ISSUER_URL}',
     sleepDurationSeconds: '${SLEEP_DURATION_SECONDS}',
+    configReloadIntervalSeconds: '${CONFIG_RELOAD_INTERVAL_SECONDS}',
     managedTenants: '${MANAGED_TENANTS}',
     logRulesEnabled: 'true',
   },
