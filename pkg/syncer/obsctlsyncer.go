@@ -218,6 +218,15 @@ func (o *ObsctlRulesSyncer) InitOrReloadObsctlConfig() error {
 			}
 		}
 
+		existingTenantCfg, foundTenant := o.c.APIs[obsctlContextAPIName].Contexts[tenant]
+		if foundTenant && !o.tenantConfigMatches(existingTenantCfg, tenantCfg) {
+			err := o.c.RemoveTenant(o.logger, tenantCfg.Tenant, obsctlContextAPIName)
+			if err != nil {
+				// We don't really care about the error here, logging only for visibility.
+				level.Info(o.logger).Log("msg", "removing tenant", "tenant", tenant, "error", err)
+			}
+		}
+
 		if err := o.c.AddTenant(o.logger, tenantCfg.Tenant, obsctlContextAPIName, tenantCfg.Tenant, tenantCfg.OIDC); err != nil {
 			level.Error(o.logger).Log("msg", "adding tenant", "tenant", tenant, "error", err)
 			return errors.Wrap(err, "adding tenant to obsctl config")
@@ -225,6 +234,24 @@ func (o *ObsctlRulesSyncer) InitOrReloadObsctlConfig() error {
 	}
 
 	return nil
+}
+
+// tenantConfigMatches checks if two tenant configs are equal. We consider them equal if they have the same tenant name
+// and OIDC config (regardless of any token that might've been already acquired and cached).
+func (o *ObsctlRulesSyncer) tenantConfigMatches(firstConfig, secondConfig config.TenantConfig) bool {
+	if firstConfig.Tenant != secondConfig.Tenant {
+		return false
+	}
+
+	if firstConfig.OIDC != secondConfig.OIDC {
+		return false
+	}
+
+	return firstConfig.OIDC.ClientID == secondConfig.OIDC.ClientID &&
+		firstConfig.OIDC.ClientSecret == secondConfig.OIDC.ClientSecret &&
+		firstConfig.OIDC.Audience == secondConfig.OIDC.Audience &&
+		firstConfig.OIDC.IssuerURL == secondConfig.OIDC.IssuerURL &&
+		firstConfig.OIDC.OfflineAccess == secondConfig.OIDC.OfflineAccess
 }
 
 func (o *ObsctlRulesSyncer) SetCurrentTenant(tenant string) error {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+
 	"github.com/rhobs/obsctl-reloader/pkg/loader"
 	"github.com/rhobs/obsctl-reloader/pkg/syncer"
 )
@@ -19,9 +20,14 @@ func SyncLoop(
 	o syncer.RulesSyncer,
 	logRulesEnabled bool,
 	sleepDurationSeconds uint,
+	configReloadIntervalSeconds uint,
 ) error {
 	for {
 		select {
+		case <-time.After(time.Duration(configReloadIntervalSeconds) * time.Second):
+			if err := o.InitOrReloadObsctlConfig(); err != nil {
+				level.Error(logger).Log("msg", "error reloading obsctl config", "error", err)
+			}
 		case <-time.After(time.Duration(sleepDurationSeconds) * time.Second):
 			prometheusRules, err := k.GetPrometheusRules()
 			if err != nil {
