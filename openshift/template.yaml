@@ -37,6 +37,7 @@ objects:
           - --log.level=info
           - --web.internal.listen=0.0.0.0:8081
           - --sleep-duration-seconds=${SLEEP_DURATION_SECONDS}
+          - --config-reload-interval-seconds=${CONFIG_RELOAD_INTERVAL_SECONDS}
           - --observatorium-api-url=${OBSERVATORIUM_URL}
           - --managed-tenants=${MANAGED_TENANTS}
           - --issuer-url=${OIDC_ISSUER_URL}
@@ -163,6 +164,8 @@ parameters:
   value: rhobs-tenant-staging
 - name: SLEEP_DURATION_SECONDS
   value: 30
+- name: CONFIG_RELOAD_INTERVAL_SECONDS
+  value: 60
 - name: MANAGED_TENANTS
   value: rhobs
 - name: REPLICAS
