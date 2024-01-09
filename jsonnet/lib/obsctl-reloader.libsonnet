@@ -157,6 +157,7 @@ function(params) {
                 '--log.level=%s' % or.config.logLevel,
                 '--web.internal.listen=0.0.0.0:%d' % or.config.ports.internal,
                 '--sleep-duration-seconds=%s' % or.config.env.sleepDurationSeconds,
+                '--config-reload-interval-seconds=%s' % or.config.env.configReloadIntervalSeconds,
                 '--observatorium-api-url=%s' % or.config.env.observatoriumURL,
                 '--managed-tenants=%s' % or.config.env.managedTenants,
                 '--issuer-url=%s' % or.config.env.oidcIssuerURL,
