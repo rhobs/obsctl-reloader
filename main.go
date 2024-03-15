@@ -76,7 +76,7 @@ func parseFlags() *cfg {
 	flag.StringVar(&cfg.managedTenants, "managed-tenants", "", "The name of the tenants whose rules should be synced. If there are multiple tenants, ensure they are comma-separated.")
 	flag.StringVar(&cfg.issuerURL, "issuer-url", "", "The OIDC issuer URL, see https://openid.net/specs/openid-connect-discovery-1_0.html#IssuerDiscovery.")
 	flag.StringVar(&cfg.audience, "audience", "", "The audience for whom the access token is intended, see https://openid.net/specs/openid-connect-core-1_0.html#IDToken.")
-	flag.BoolVar(&cfg.logRulesEnabled, "log-rules-enabled", true, "Enable syncing Loki logging rules. Always on by default.")
+	flag.BoolVar(&cfg.logRulesEnabled, "log-rules-enabled", false, "Enable syncing Loki logging rules.")
 
 	flag.StringVar(&cfg.logLevel, "log.level", "info", "Log filtering level. One of: debug, info, warn, error.")
 	flag.StringVar(&cfg.listenInternal, "web.internal.listen", ":8081", "The address on which the internal server listens.")
