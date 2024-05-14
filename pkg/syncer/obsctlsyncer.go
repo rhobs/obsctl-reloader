@@ -126,7 +126,6 @@ func AutoDetectTenantSecrets(
 
 	// Filter secrets for configured tenants.
 	configuredTenants := strings.Split(managedTenants, ",")
-	missingSecretTenants := strings.Split(managedTenants, ",")
 	for i := range secret.Items {
 		lbls := secret.Items[i].Labels
 
@@ -137,9 +136,6 @@ func AutoDetectTenantSecrets(
 		// If tenant is not configured, skip.
 		if !slices.Contains(configuredTenants, lbls["tenant"]) {
 			continue
-		} else {
-			s, _ := slices.BinarySearch(missingSecretTenants, lbls["tenant"])
-			missingSecretTenants = slices.Delete(missingSecretTenants, s, s+1)
 		}
 
 		if secret.Items[i].Data == nil {
@@ -175,10 +171,6 @@ func AutoDetectTenantSecrets(
 		tenantSecret[lbls["tenant"]] = tOIDC
 	}
 
-	if len(missingSecretTenants) != 0 {
-		return tenantSecret, errors.Newf("missing secrets for tenants: %v", missingSecretTenants)
-	}
-
 	return tenantSecret, nil
 }
 
@@ -209,9 +201,7 @@ func (o *ObsctlRulesSyncer) InitOrReloadObsctlConfig() error {
 	tenantSecrets, err := o.autoDetectSecretsFn(o.ctx, o.k8s, o.namespace, o.audience, o.issuerURL, o.managedTenants)
 	if err != nil {
 		level.Error(o.logger).Log("msg", "auto detecting tenant secrets", "error", err)
-		if len(tenantSecrets) == 0 {
-			return errors.Wrap(err, "no tenant secrets auto-detected")
-		}
+		return errors.Wrap(err, "auto detecting tenant secrets")
 	}
 
 	// Add all managed tenants under the API.
