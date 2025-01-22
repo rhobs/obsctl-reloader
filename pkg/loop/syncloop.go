@@ -37,12 +37,7 @@ func SyncLoop(
 
 			// Set each tenant as current and set rules.
 			for tenant, ruleGroups := range k.GetTenantMetricsRuleGroups(prometheusRules) {
-				if err := o.SetCurrentTenant(tenant); err != nil {
-					level.Error(logger).Log("msg", "error setting tenant", "tenant", tenant, "error", err)
-					continue
-				}
-
-				err = o.MetricsSet(ruleGroups)
+				err = o.MetricsSet(tenant, ruleGroups)
 				if err != nil {
 					level.Error(logger).Log("msg", "error setting rules", "tenant", tenant, "error", err)
 					continue

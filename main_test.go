@@ -71,7 +71,7 @@ func (r *testRulesSyncer) LogsRecordingSet(rules lokiv1.RecordingRuleSpec) error
 	return nil
 }
 
-func (r *testRulesSyncer) MetricsSet(rules monitoringv1.PrometheusRuleSpec) error {
+func (r *testRulesSyncer) MetricsSet(tenant string, rules monitoringv1.PrometheusRuleSpec) error {
 	r.metricsRulesCnt++
 	return nil
 }
