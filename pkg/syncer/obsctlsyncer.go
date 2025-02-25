@@ -362,7 +362,8 @@ func (o *ObsctlRulesSyncer) MetricsSet(tenant string, rules monitoringv1.Prometh
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("prometheus-rules-%s-%d", tenant, time.Now().Unix()),
 			Labels: map[string]string{
-				"tenant": tenant,
+				"tenant":                             tenant,
+				"operator.thanos.io/prometheus-rule": "true",
 			},
 		},
 		Spec: monitoringv1.PrometheusRuleSpec{

@@ -52,6 +52,7 @@ func TestMetricsSet(t *testing.T) {
 
 				rule := rules.Items[0]
 				require.Equal(t, "team-a", rule.Labels["tenant"])
+				require.Equal(t, "true", rule.Labels["operator.thanos.io/prometheus-rule"])
 				require.Equal(t, "metric:recording", rule.Spec.Groups[0].Rules[0].Record)
 				require.Equal(t, `sum(http_requests_total{tenant="team-a"})`, rule.Spec.Groups[0].Rules[0].Expr.String())
 			},
