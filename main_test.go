@@ -71,7 +71,7 @@ func (r *testRulesSyncer) LogsRecordingSet(rules lokiv1.RecordingRuleSpec) error
 	return nil
 }
 
-func (r *testRulesSyncer) MetricsSet(rules monitoringv1.PrometheusRuleSpec) error {
+func (r *testRulesSyncer) MetricsSet(tenant string, rules monitoringv1.PrometheusRuleSpec) error {
 	r.metricsRulesCnt++
 	return nil
 }
@@ -85,7 +85,7 @@ func TestSyncLoop(t *testing.T) {
 
 	testutil.Ok(t, loop.SyncLoop(ctx, log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), rl, rs, true, 5, 60))
 
-	testutil.Equals(t, 12, rs.setCurrentTenantCnt)
+	testutil.Equals(t, 8, rs.setCurrentTenantCnt)
 	testutil.Equals(t, 4, rs.metricsRulesCnt)
 	testutil.Equals(t, 8, rs.logsRulesCnt)
 }

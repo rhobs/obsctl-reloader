@@ -104,7 +104,7 @@ func main() {
 		panic("Failed to read kubeconfig")
 	}
 
-	mapper, err := apiutil.NewDynamicRESTMapper(k8sCfg)
+	mapper, err := apiutil.NewDynamicRESTMapper(k8sCfg, http.DefaultClient)
 	if err != nil {
 		panic("Failed to create new dynamic REST mapper")
 	}

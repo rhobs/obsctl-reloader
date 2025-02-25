@@ -3,9 +3,9 @@ package syncer
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"strconv"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/efficientgo/core/errors"
 	"github.com/go-kit/log"
@@ -14,14 +14,17 @@ import (
 	"github.com/observatorium/api/client/parameters"
 	"github.com/observatorium/obsctl/pkg/config"
 	"github.com/observatorium/obsctl/pkg/fetcher"
+	"github.com/prometheus-community/prom-label-proxy/injectproxy"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/prometheus/pkg/rulefmt"
+	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/promql/parser"
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -345,60 +348,90 @@ func (o *ObsctlRulesSyncer) LogsRecordingSet(rules lokiv1.RecordingRuleSpec) err
 	return nil
 }
 
-func (o *ObsctlRulesSyncer) MetricsSet(rules monitoringv1.PrometheusRuleSpec) error {
+func (o *ObsctlRulesSyncer) MetricsSet(tenant string, rules monitoringv1.PrometheusRuleSpec) error {
 	level.Debug(o.logger).Log("msg", "setting metrics for tenant")
-	fc, currentTenant, err := fetcher.NewCustomFetcher(o.ctx, o.logger)
-	o.promRulesSetOps.WithLabelValues(string(currentTenant)).Inc()
+	o.promRulesSetOps.WithLabelValues(string(tenant)).Inc()
 
-	if err != nil {
-		level.Error(o.logger).Log("msg", "getting fetcher client", "error", err)
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "get_fetcher_client").Inc()
-		return errors.Wrap(err, "getting fetcher client")
+	enforcer := injectproxy.NewEnforcer([]*labels.Matcher{{
+		Name:  "tenant",
+		Type:  labels.MatchEqual,
+		Value: tenant,
+	}}...)
+
+	newRule := &monitoringv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("prometheus-rules-%s-%d", tenant, time.Now().Unix()),
+			Labels: map[string]string{
+				"tenant":                             tenant,
+				"operator.thanos.io/prometheus-rule": "true",
+			},
+		},
+		Spec: monitoringv1.PrometheusRuleSpec{
+			Groups: make([]monitoringv1.RuleGroup, len(rules.Groups)),
+		},
 	}
 
-	ruleGroups, err := json.Marshal(rules)
-	if err != nil {
-		level.Error(o.logger).Log("msg", "converting monitoringv1 rules to json", "error", err)
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "converting_to_json").Inc()
-		return errors.Wrap(err, "converting monitoringv1 rules to json")
-	}
-
-	groups, errs := rulefmt.Parse(ruleGroups)
-	if errs != nil || groups == nil {
-		for e := range errs {
-			level.Error(o.logger).Log("msg", "rulefmt parsing rules", "error", e, "groups", groups)
+	for i, group := range rules.Groups {
+		newGroup := monitoringv1.RuleGroup{
+			Name:     group.Name,
+			Interval: group.Interval,
+			Rules:    make([]monitoringv1.Rule, len(group.Rules)),
 		}
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "parsing_rules").Inc()
-		return errors.Wrap(errs[0], "rulefmt parsing rules")
-	}
 
-	body, err := yaml.Marshal(groups)
-	if err != nil {
-		level.Error(o.logger).Log("msg", "converting rulefmt rules to yaml", "error", err)
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "converting_to_yaml").Inc()
-		return errors.Wrap(err, "converting rulefmt rules to yaml")
-	}
+		for j, rule := range group.Rules {
+			newRule := rule.DeepCopy()
 
-	level.Debug(o.logger).Log("msg", "setting rule file", "rule", string(body))
-	resp, err := fc.SetRawRulesWithBodyWithResponse(o.ctx, currentTenant, "application/yaml", bytes.NewReader(body))
-	if err != nil {
-		level.Error(o.logger).Log("msg", "getting response", "error", err)
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "getting_response").Inc()
-		return err
-	}
-	o.promRulesStoreOps.WithLabelValues(string(currentTenant), strconv.Itoa(resp.StatusCode())).Inc()
+			// Add tenant label to rule labels if they exist, create if they don't
+			if newRule.Labels == nil {
+				newRule.Labels = make(map[string]string)
+			}
+			newRule.Labels["tenant"] = string(tenant)
 
-	if resp.StatusCode()/100 != 2 {
-		if len(resp.Body) != 0 {
-			level.Error(o.logger).Log("msg", "setting rules", "error", string(resp.Body))
-			o.promRulesSetFailures.WithLabelValues(string(currentTenant), "rules_store_error").Inc()
-			return errors.Newf("non-200 status code: %v with body: %v", resp.StatusCode(), string(resp.Body))
+			// Modify PromQL expressions to include tenant label using prom-label-proxy
+			if rule.Record != "" {
+				newRule.Record = rule.Record
+				expr, err := enforceLabelsInExpr(enforcer, rule.Expr.String())
+				if err != nil {
+					level.Error(o.logger).Log("msg", "enforcing tenant label", "error", err)
+					o.promRulesSetFailures.WithLabelValues(string(tenant), "enforce_label").Inc()
+					return errors.Wrap(err, "enforcing tenant label")
+				}
+				newRule.Expr = intstr.FromString(expr)
+			} else if rule.Alert != "" {
+				newRule.Alert = rule.Alert
+				expr, err := enforceLabelsInExpr(enforcer, rule.Expr.String())
+				if err != nil {
+					level.Error(o.logger).Log("msg", "enforcing tenant label", "error", err)
+					o.promRulesSetFailures.WithLabelValues(string(tenant), "parse_expr").Inc()
+					return errors.Wrap(err, "parsing alerting rule expression")
+				}
+				newRule.Expr = intstr.FromString(expr)
+			}
+
+			newGroup.Rules[j] = *newRule
 		}
-		o.promRulesSetFailures.WithLabelValues(string(currentTenant), "rules_store_error").Inc()
-		return errors.Newf("non-200 status code: %v with empty body", resp.StatusCode())
+
+		newRule.Spec.Groups[i] = newGroup
 	}
 
-	level.Debug(o.logger).Log("msg", string(resp.Body))
+	if err := o.k8s.Create(o.ctx, newRule); err != nil {
+		level.Error(o.logger).Log("msg", "creating new prometheus rule", "error", err)
+		o.promRulesSetFailures.WithLabelValues(string(tenant), "create_rule").Inc()
+		return errors.Wrap(err, "creating new prometheus rule")
+	}
 
 	return nil
+}
+
+func enforceLabelsInExpr(e *injectproxy.Enforcer, expr string) (string, error) {
+	parsedExpr, err := parser.ParseExpr(expr)
+	if err != nil {
+		return "", fmt.Errorf("parse expr error: %w", err)
+	}
+
+	if err := e.EnforceNode(parsedExpr); err != nil {
+		return "", fmt.Errorf("enforce node error: %w", err)
+	}
+
+	return parsedExpr.String(), nil
 }

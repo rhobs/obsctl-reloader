@@ -25,6 +25,8 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 		}, []string{"tenant"}),
 	}
 
+	interval30s := monitoringv1.Duration("30s")
+	interval1m := monitoringv1.Duration("1m")
 	for _, tc := range []struct {
 		name    string
 		tenants string
@@ -52,7 +54,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 						Groups: []monitoringv1.RuleGroup{
 							{
 								Name:     "TestGroup",
-								Interval: "30s",
+								Interval: &interval30s,
 								Rules: []monitoringv1.Rule{
 									{
 										Record: "TestRecordingRule",
@@ -74,7 +76,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 					Groups: []monitoringv1.RuleGroup{
 						{
 							Name:     "TestGroup",
-							Interval: "30s",
+							Interval: &interval30s,
 							Rules: []monitoringv1.Rule{
 								{
 									Record: "TestRecordingRule",
@@ -95,7 +97,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 						Groups: []monitoringv1.RuleGroup{
 							{
 								Name:     "TestGroup",
-								Interval: "30s",
+								Interval: &interval30s,
 								Rules: []monitoringv1.Rule{
 									{
 										Record: "TestRecordingRule",
@@ -105,7 +107,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 							},
 							{
 								Name:     "TestGroup2",
-								Interval: "1m",
+								Interval: &interval1m,
 								Rules: []monitoringv1.Rule{
 									{
 										Alert: "TestAlertingRule",
@@ -127,7 +129,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 					Groups: []monitoringv1.RuleGroup{
 						{
 							Name:     "TestGroup",
-							Interval: "30s",
+							Interval: &interval30s,
 							Rules: []monitoringv1.Rule{
 								{
 									Record: "TestRecordingRule",
@@ -137,7 +139,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 						},
 						{
 							Name:     "TestGroup2",
-							Interval: "1m",
+							Interval: &interval1m,
 							Rules: []monitoringv1.Rule{
 								{
 									Alert: "TestAlertingRule",
@@ -158,7 +160,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 						Groups: []monitoringv1.RuleGroup{
 							{
 								Name:     "TestGroup",
-								Interval: "30s",
+								Interval: &interval30s,
 								Rules: []monitoringv1.Rule{
 									{
 										Record: "TestRecordingRule",
@@ -168,7 +170,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 							},
 							{
 								Name:     "TestGroup2",
-								Interval: "1m",
+								Interval: &interval1m,
 								Rules: []monitoringv1.Rule{
 									{
 										Alert: "TestAlertingRule",
@@ -189,7 +191,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 						Groups: []monitoringv1.RuleGroup{
 							{
 								Name:     "TestYoloGroup",
-								Interval: "30s",
+								Interval: &interval30s,
 								Rules: []monitoringv1.Rule{
 									{
 										Record: "TestYoloRule",
@@ -211,7 +213,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 					Groups: []monitoringv1.RuleGroup{
 						{
 							Name:     "TestGroup",
-							Interval: "30s",
+							Interval: &interval30s,
 							Rules: []monitoringv1.Rule{
 								{
 									Record: "TestRecordingRule",
@@ -221,7 +223,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 						},
 						{
 							Name:     "TestGroup2",
-							Interval: "1m",
+							Interval: &interval1m,
 							Rules: []monitoringv1.Rule{
 								{
 									Alert: "TestAlertingRule",
@@ -235,7 +237,7 @@ func TestGetTenantMetricsRuleGroups(t *testing.T) {
 					Groups: []monitoringv1.RuleGroup{
 						{
 							Name:     "TestYoloGroup",
-							Interval: "30s",
+							Interval: &interval30s,
 							Rules: []monitoringv1.Rule{
 								{
 									Record: "TestYoloRule",

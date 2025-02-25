@@ -138,7 +138,11 @@ func (k *KubeRulesLoader) GetPrometheusRules() ([]*monitoringv1.PrometheusRule, 
 	}
 
 	k.promRuleFetches.Inc()
-	return prometheusRules.Items, nil
+	ptrRules := make([]*monitoringv1.PrometheusRule, len(prometheusRules.Items))
+	for i := range prometheusRules.Items {
+		ptrRules[i] = &prometheusRules.Items[i]
+	}
+	return ptrRules, nil
 }
 
 func (k *KubeRulesLoader) GetTenantLogsAlertingRuleGroups(alertingRules []lokiv1.AlertingRule) map[string]lokiv1.AlertingRuleSpec {

@@ -12,5 +12,5 @@ type RulesSyncer interface {
 
 	LogsAlertingSet(rules lokiv1.AlertingRuleSpec) error
 	LogsRecordingSet(rules lokiv1.RecordingRuleSpec) error
-	MetricsSet(rules monitoringv1.PrometheusRuleSpec) error
+	MetricsSet(tenant string, rules monitoringv1.PrometheusRuleSpec) error
 }
