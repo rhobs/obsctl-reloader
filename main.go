@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"syscall"
 
 	"github.com/go-kit/log"
@@ -36,6 +38,7 @@ type cfg struct {
 	observatoriumURL     string
 	sleepDurationSeconds uint
 	managedTenants       string
+	tenantUUIDs          string
 	audience             string
 	issuerURL            string
 	logRulesEnabled      bool
@@ -74,6 +77,7 @@ func parseFlags() *cfg {
 	flag.UintVar(&cfg.configReloadInterval, "config-reload-interval-seconds", defaultConfigReloadIntervalSeconds, "The interval in seconds for reloading configuration.")
 	flag.StringVar(&cfg.observatoriumURL, "observatorium-api-url", "", "The URL of the Observatorium API to which rules will be synced.")
 	flag.StringVar(&cfg.managedTenants, "managed-tenants", "", "The name of the tenants whose rules should be synced. If there are multiple tenants, ensure they are comma-separated.")
+	flag.StringVar(&cfg.tenantUUIDs, "tenant-uuids", "", "Mapping of tenant names to UUIDs in format 'tenant1=uuid1,tenant2=uuid2'")
 	flag.StringVar(&cfg.issuerURL, "issuer-url", "", "The OIDC issuer URL, see https://openid.net/specs/openid-connect-discovery-1_0.html#IssuerDiscovery.")
 	flag.StringVar(&cfg.audience, "audience", "", "The audience for whom the access token is intended, see https://openid.net/specs/openid-connect-core-1_0.html#IDToken.")
 	flag.BoolVar(&cfg.logRulesEnabled, "log-rules-enabled", false, "Enable syncing Loki logging rules.")
@@ -83,6 +87,28 @@ func parseFlags() *cfg {
 
 	flag.Parse()
 	return cfg
+}
+
+func parseTenantUUIDs(tenantUUIDsStr string) (map[string]string, error) {
+	if tenantUUIDsStr == "" {
+		return nil, nil
+	}
+
+	tenantUUIDs := make(map[string]string)
+	pairs := strings.Split(tenantUUIDsStr, ",")
+	for _, pair := range pairs {
+		parts := strings.Split(pair, "=")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid tenant UUID mapping format: %s", pair)
+		}
+		tenant := strings.TrimSpace(parts[0])
+		uuid := strings.TrimSpace(parts[1])
+		if tenant == "" || uuid == "" {
+			return nil, fmt.Errorf("empty tenant or UUID in mapping: %s", pair)
+		}
+		tenantUUIDs[tenant] = uuid
+	}
+	return tenantUUIDs, nil
 }
 
 func main() {
@@ -97,6 +123,13 @@ func main() {
 
 	logger := setupLogger(cfg.logLevel)
 	defer level.Info(logger).Log("msg", "exiting")
+
+	// After parsing flags, parse the tenant UUIDs
+	tenantUUIDs, err := parseTenantUUIDs(cfg.tenantUUIDs)
+	if err != nil {
+		level.Error(logger).Log("msg", "error parsing tenant UUIDs", "error", err)
+		os.Exit(1)
+	}
 
 	// Create kubernetes client for deployments
 	k8sCfg, err := k8sconfig.GetConfig()
@@ -150,6 +183,7 @@ func main() {
 		cfg.audience,
 		cfg.issuerURL,
 		cfg.managedTenants,
+		tenantUUIDs,
 		reg,
 	)
 	if err := o.InitOrReloadObsctlConfig(); err != nil {
