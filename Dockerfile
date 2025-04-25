@@ -3,7 +3,7 @@ WORKDIR /app
 COPY . .
 RUN go build -mod=readonly -o /tmp/obsctl-reloader
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.6
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1255
 COPY --chown=0:0 --from=builder /tmp/obsctl-reloader /usr/local/bin/
 
 # level=error msg="add api" error="creating config directory: mkdir /.config: permission denied"
