@@ -2,7 +2,7 @@ module github.com/rhobs/obsctl-reloader
 
 go 1.23.0
 
-toolchain go1.23.1
+toolchain go1.24.3
 
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v1.8.2-0.20210621150501-ff58416a0b02
 
