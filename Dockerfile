@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12 AS builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.23 as builder
 WORKDIR /app
 COPY . .
 RUN go build -mod=readonly -o /tmp/obsctl-reloader
