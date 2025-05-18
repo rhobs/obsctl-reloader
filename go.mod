@@ -7,7 +7,7 @@ toolchain go1.23.1
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v1.8.2-0.20210621150501-ff58416a0b02
 
 require (
-	github.com/efficientgo/core v1.0.0-rc.2
+	github.com/efficientgo/core v1.0.0-rc.3
 	github.com/go-kit/log v0.2.1
 	github.com/grafana/loki/operator/apis/loki v0.0.0-20230323133219-93a1c21da5c9
 	github.com/metalmatze/signal v0.0.0-20210307161603-1c9aa721a97a
