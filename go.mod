@@ -15,7 +15,7 @@ require (
 	github.com/observatorium/obsctl v0.1.0-rc.0.0.20230616134804-751b92bac586
 	github.com/oklog/run v1.1.0
 	github.com/prometheus-community/prom-label-proxy v0.3.1-0.20210623095334-9d425172d7bb
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.82.2
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/prometheus v1.8.2-0.20220303173753-edfe657b5405
 	github.com/stretchr/testify v1.9.0
