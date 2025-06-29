@@ -13,7 +13,7 @@ require (
 	github.com/metalmatze/signal v0.0.0-20210307161603-1c9aa721a97a
 	github.com/observatorium/api v0.1.3-0.20221005180515-c3230526775b
 	github.com/observatorium/obsctl v0.1.0-rc.0.0.20230616134804-751b92bac586
-	github.com/oklog/run v1.1.0
+	github.com/oklog/run v1.2.0
 	github.com/prometheus-community/prom-label-proxy v0.3.1-0.20210623095334-9d425172d7bb
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
 	github.com/prometheus/client_golang v1.19.1
