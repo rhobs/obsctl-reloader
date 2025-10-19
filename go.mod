@@ -4,7 +4,7 @@ go 1.23.0
 
 toolchain go1.23.1
 
-replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v1.8.2-0.20210621150501-ff58416a0b02
+replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v1.99.0
 
 require (
 	github.com/efficientgo/core v1.0.0-rc.2
@@ -17,7 +17,7 @@ require (
 	github.com/prometheus-community/prom-label-proxy v0.3.1-0.20210623095334-9d425172d7bb
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
 	github.com/prometheus/client_golang v1.19.1
-	github.com/prometheus/prometheus v1.8.2-0.20220303173753-edfe657b5405
+	github.com/prometheus/prometheus v1.99.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	gopkg.in/yaml.v3 v3.0.1
