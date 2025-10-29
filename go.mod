@@ -40,7 +40,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-openapi/analysis v0.20.0 // indirect
 	github.com/go-openapi/errors v0.20.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
