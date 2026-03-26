@@ -9,7 +9,7 @@ replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v1.
 require (
 	github.com/efficientgo/core v1.0.0-rc.2
 	github.com/go-kit/log v0.2.1
-	github.com/grafana/loki/operator/apis/loki v0.0.0-20230323133219-93a1c21da5c9
+	github.com/grafana/loki/operator/apis/loki v0.0.0-20241021105923-5e970e50b166
 	github.com/metalmatze/signal v0.0.0-20210307161603-1c9aa721a97a
 	github.com/observatorium/api v0.1.3-0.20221005180515-c3230526775b
 	github.com/observatorium/obsctl v0.1.0-rc.0.0.20230616134804-751b92bac586
