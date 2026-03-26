@@ -51,10 +51,12 @@ func TestMetricsSet(t *testing.T) {
 				require.Len(t, rules.Items, 1)
 
 				rule := rules.Items[0]
-				require.Equal(t, "team-a", rule.Labels["tenant"])
+				require.Equal(t, "team-a", rule.Labels["obsctl-reloader-generated-tenant"])
+				require.Equal(t, "123", rule.Labels["obsctl-reloader-generated-uuid"])
 				require.Equal(t, "true", rule.Labels["operator.thanos.io/prometheus-rule"])
 				require.Equal(t, "metric:recording", rule.Spec.Groups[0].Rules[0].Record)
-				require.Equal(t, `sum(http_requests_total{tenant="team-a"})`, rule.Spec.Groups[0].Rules[0].Expr.String())
+				require.Equal(t, "123", rule.Spec.Groups[0].Rules[0].Labels["tenant"])
+				require.Equal(t, `sum(http_requests_total{tenant="123"})`, rule.Spec.Groups[0].Rules[0].Expr.String())
 			},
 		},
 		{
@@ -84,11 +86,12 @@ func TestMetricsSet(t *testing.T) {
 				require.Len(t, rules.Items, 1)
 
 				rule := rules.Items[0]
-				require.Equal(t, "team-b", rule.Labels["tenant"])
+				require.Equal(t, "team-b", rule.Labels["obsctl-reloader-generated-tenant"])
+				require.Equal(t, "456", rule.Labels["obsctl-reloader-generated-uuid"])
 				require.Equal(t, "HighErrorRate", rule.Spec.Groups[0].Rules[0].Alert)
 				require.Equal(t, "warning", rule.Spec.Groups[0].Rules[0].Labels["severity"])
-				require.Equal(t, "team-b", rule.Spec.Groups[0].Rules[0].Labels["tenant"])
-				require.Equal(t, `rate(errors_total{tenant="team-b"}[5m]) > 0.1`, rule.Spec.Groups[0].Rules[0].Expr.String())
+				require.Equal(t, "456", rule.Spec.Groups[0].Rules[0].Labels["tenant"])
+				require.Equal(t, `rate(errors_total{tenant="456"}[5m]) > 0.1`, rule.Spec.Groups[0].Rules[0].Expr.String())
 			},
 		},
 		{
@@ -118,10 +121,12 @@ func TestMetricsSet(t *testing.T) {
 				require.Len(t, rules.Items, 1)
 
 				rule := rules.Items[0]
-				require.Equal(t, "team-c", rule.Labels["tenant"])
+				require.Equal(t, "team-c", rule.Labels["obsctl-reloader-generated-tenant"])
+				require.Equal(t, "789", rule.Labels["obsctl-reloader-generated-uuid"])
 				require.Len(t, rule.Spec.Groups[0].Rules, 2)
-				require.Equal(t, `sum by(job) (rate(http_requests_total{tenant="team-c"}[5m]))`, rule.Spec.Groups[0].Rules[0].Expr.String())
-				require.Equal(t, `http_request_duration_seconds{tenant="team-c"} > 2`, rule.Spec.Groups[0].Rules[1].Expr.String())
+				require.Equal(t, "789", rule.Spec.Groups[0].Rules[0].Labels["tenant"])
+				require.Equal(t, `sum by(job) (rate(http_requests_total{tenant="789"}[5m]))`, rule.Spec.Groups[0].Rules[0].Expr.String())
+				require.Equal(t, `http_request_duration_seconds{tenant="789"} > 2`, rule.Spec.Groups[0].Rules[1].Expr.String())
 			},
 		},
 	}
@@ -141,6 +146,11 @@ func TestMetricsSet(t *testing.T) {
 				"test-audience",
 				"test-issuer",
 				"team-a,team-b,team-c",
+				map[string]string{
+					"team-a": "123",
+					"team-b": "456",
+					"team-c": "789",
+				},
 				reg,
 			)
 

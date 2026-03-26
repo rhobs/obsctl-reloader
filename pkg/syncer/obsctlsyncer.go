@@ -41,11 +41,11 @@ type ObsctlRulesSyncer struct {
 	skipClientCheck bool
 	k8s             client.Client
 	namespace       string
-
-	apiURL         string
-	audience       string
-	issuerURL      string
-	managedTenants string
+	tenantUUIDs     map[string]string
+	apiURL          string
+	audience        string
+	issuerURL       string
+	managedTenants  string
 
 	autoDetectSecretsFn func(ctx context.Context,
 		k8s client.Client,
@@ -66,18 +66,19 @@ func NewObsctlRulesSyncer(
 	logger log.Logger,
 	kc client.Client,
 	namespace, apiURL, audience, issuerURL, managedTenants string,
+	tenantUUIDs map[string]string,
 	reg prometheus.Registerer,
 ) *ObsctlRulesSyncer {
 	return &ObsctlRulesSyncer{
-		ctx:            ctx,
-		logger:         logger,
-		k8s:            kc,
-		apiURL:         apiURL,
-		namespace:      namespace,
-		audience:       audience,
-		issuerURL:      issuerURL,
-		managedTenants: managedTenants,
-
+		ctx:                 ctx,
+		logger:              logger,
+		k8s:                 kc,
+		apiURL:              apiURL,
+		namespace:           namespace,
+		audience:            audience,
+		issuerURL:           issuerURL,
+		managedTenants:      managedTenants,
+		tenantUUIDs:         tenantUUIDs,
 		autoDetectSecretsFn: AutoDetectTenantSecrets,
 
 		lokiRulesSetOps: promauto.With(reg).NewCounterVec(prometheus.CounterOpts{
@@ -352,17 +353,24 @@ func (o *ObsctlRulesSyncer) MetricsSet(tenant string, rules monitoringv1.Prometh
 	level.Debug(o.logger).Log("msg", "setting metrics for tenant")
 	o.promRulesSetOps.WithLabelValues(string(tenant)).Inc()
 
+	tenantUUID, ok := o.tenantUUIDs[tenant]
+	if !ok {
+		level.Error(o.logger).Log("msg", "tenant UUID not found", "tenant", tenant)
+		return errors.Newf("tenant UUID not found: %s", tenant)
+	}
+
 	enforcer := injectproxy.NewEnforcer([]*labels.Matcher{{
 		Name:  "tenant",
 		Type:  labels.MatchEqual,
-		Value: tenant,
+		Value: tenantUUID,
 	}}...)
 
 	newRule := &monitoringv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("prometheus-rules-%s-%d", tenant, time.Now().Unix()),
 			Labels: map[string]string{
-				"tenant":                             tenant,
+				"obsctl-reloader-generated-tenant":   tenant,
+				"obsctl-reloader-generated-uuid":     tenantUUID,
 				"operator.thanos.io/prometheus-rule": "true",
 			},
 		},
@@ -385,7 +393,7 @@ func (o *ObsctlRulesSyncer) MetricsSet(tenant string, rules monitoringv1.Prometh
 			if newRule.Labels == nil {
 				newRule.Labels = make(map[string]string)
 			}
-			newRule.Labels["tenant"] = string(tenant)
+			newRule.Labels["tenant"] = tenantUUID
 
 			// Modify PromQL expressions to include tenant label using prom-label-proxy
 			if rule.Record != "" {
